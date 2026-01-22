@@ -149,7 +149,8 @@ final class NavigationManager: NSObject, ObservableObject {
             // Build request
             let request = MKDirections.Request()
             if let c = currentCoordinate {
-                request.source = MKMapItem(placemark: MKPlacemark(coordinate: c))
+                let location = CLLocation(latitude: c.latitude, longitude: c.longitude)
+                request.source = MKMapItem(location: location, address: nil)
             } else {
                 request.source = MKMapItem.forCurrentLocation()
             }

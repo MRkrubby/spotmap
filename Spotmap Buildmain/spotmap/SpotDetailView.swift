@@ -118,8 +118,8 @@ if let data = spot.photoData, let ui = UIImage(data: data) {
     }
 
     private func openInAppleMaps() {
-        let placemark = MKPlacemark(coordinate: spot.location.coordinate)
-        let item = MKMapItem(placemark: placemark)
+        let location = CLLocation(latitude: spot.location.coordinate.latitude, longitude: spot.location.coordinate.longitude)
+        let item = MKMapItem(location: location, address: nil)
         item.name = spot.title
         item.openInMaps(launchOptions: [
             MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
@@ -127,12 +127,11 @@ if let data = spot.photoData, let ui = UIImage(data: data) {
     }
 
     private func startInAppNavigation() {
-        let placemark = MKPlacemark(coordinate: spot.location.coordinate)
-        let item = MKMapItem(placemark: placemark)
+        let location = CLLocation(latitude: spot.location.coordinate.latitude, longitude: spot.location.coordinate.longitude)
+        let item = MKMapItem(location: location, address: nil)
         item.name = spot.title
         nav.previewNavigation(to: item, name: spot.title)
         // Avoid stacked sheets: close the detail sheet first, then show route preview.
         dismiss()
     }
 }
-
