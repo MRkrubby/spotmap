@@ -137,7 +137,7 @@ struct SpotMapView: View {
 
             // Spots list
             .sheet(isPresented: $showingSpotsList) {
-                SpotsListView(repo: vm.repo) { spot in
+                SpotsListView(repo: vm.repo, referenceLocation: vm.locationManager.lastLocation) { spot in
                     vm.selectedSpot = spot
                     vm.focus(on: spot.location.coordinate)
                 }
@@ -329,6 +329,7 @@ if exploreEnabled {
         }
         .onMapCameraChange(frequency: .onEnd) { context in
             vm.mapCenterChanged(to: context.region.center)
+            visibleRegion = context.region
         }
         .onChange(of: selection) { _, newValue in
             guard let recordName = newValue else { return }
@@ -609,4 +610,3 @@ private struct StatPill: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
-
