@@ -210,7 +210,6 @@ private struct JourneyStore {
 
 // MARK: - Explore / achievements store
 
-@MainActor
 final class ExploreStore: ObservableObject {
     static let shared = ExploreStore()
 
@@ -235,7 +234,9 @@ final class ExploreStore: ObservableObject {
         for p in points {
             tiles.insert(Self.tileId(lat: p.lat, lon: p.lon, zoom: zoom))
         }
-        visitedTiles = tiles
+        Task { @MainActor in
+            visitedTiles = tiles
+        }
         Self.saveSet(tiles, key: tilesKey)
 
         // Cities (sample start + end only, async)
