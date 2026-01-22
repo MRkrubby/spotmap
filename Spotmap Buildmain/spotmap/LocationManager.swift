@@ -81,7 +81,6 @@ struct FriendProfile: Identifiable, Hashable, Codable {
 ///
 /// Named `FriendsStore` (instead of `FriendsRepository`) to avoid symbol clashes
 /// if a project or dependency also defines a `FriendsRepository` type.
-@MainActor
 final class FriendsStore: ObservableObject {
     @Published private(set) var me: FriendProfile
     @Published private(set) var friends: [FriendProfile] = []
@@ -168,7 +167,7 @@ final class FriendsStore: ObservableObject {
     func publish() async {
         guard isEnabled else { return }
         do {
-            lastError = nil
+            await setLastError(nil)
             try await ensureCloudKitAvailable()
             let recordID = CKRecord.ID(recordName: "friend-\(me.code)")
             let record = CKRecord(recordType: "FriendProfile", recordID: recordID)
@@ -185,18 +184,18 @@ final class FriendsStore: ObservableObject {
             }
             _ = try await db.save(record)
         } catch {
-            lastError = error.localizedDescription
+            await setLastError(error.localizedDescription)
         }
     }
 
     func refreshFriends() async {
         guard isEnabled else { return }
         do {
-            lastError = nil
+            await setLastError(nil)
             try await ensureCloudKitAvailable()
             let codes = Array(followingCodes())
             guard !codes.isEmpty else {
-                friends = []
+                await setFriends([])
                 return
             }
 
@@ -207,9 +206,10 @@ final class FriendsStore: ObservableObject {
                     loaded.append(Self.decode(record))
                 }
             }
-            friends = loaded.sorted(by: { $0.displayName < $1.displayName })
+            let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
+            await setFriends(sorted)
         } catch {
-            lastError = error.localizedDescription
+            await setLastError(error.localizedDescription)
         }
     }
 
@@ -235,6 +235,16 @@ final class FriendsStore: ObservableObject {
         if let data = try? JSONEncoder().encode(me) {
             UserDefaults.standard.set(data, forKey: meKey)
         }
+    }
+
+    @MainActor
+    private func setLastError(_ message: String?) {
+        lastError = message
+    }
+
+    @MainActor
+    private func setFriends(_ values: [FriendProfile]) {
+        friends = values
     }
 
     private func ensureCloudKitAvailable() async throws {
