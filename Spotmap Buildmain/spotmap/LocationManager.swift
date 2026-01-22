@@ -167,9 +167,7 @@ final class FriendsStore: ObservableObject {
     func publish() async {
         guard isEnabled else { return }
         do {
-            await MainActor.run {
-                lastError = nil
-            }
+            await setLastError(nil)
             try await ensureCloudKitAvailable()
             let recordID = CKRecord.ID(recordName: "friend-\(me.code)")
             let record = CKRecord(recordType: "FriendProfile", recordID: recordID)
@@ -186,24 +184,18 @@ final class FriendsStore: ObservableObject {
             }
             _ = try await db.save(record)
         } catch {
-            await MainActor.run {
-                lastError = error.localizedDescription
-            }
+            await setLastError(error.localizedDescription)
         }
     }
 
     func refreshFriends() async {
         guard isEnabled else { return }
         do {
-            await MainActor.run {
-                lastError = nil
-            }
+            await setLastError(nil)
             try await ensureCloudKitAvailable()
             let codes = Array(followingCodes())
             guard !codes.isEmpty else {
-                await MainActor.run {
-                    friends = []
-                }
+                await setFriends([])
                 return
             }
 
@@ -215,13 +207,9 @@ final class FriendsStore: ObservableObject {
                 }
             }
             let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
-            await MainActor.run {
-                friends = sorted
-            }
+            await setFriends(sorted)
         } catch {
-            await MainActor.run {
-                lastError = error.localizedDescription
-            }
+            await setLastError(error.localizedDescription)
         }
     }
 
@@ -247,6 +235,16 @@ final class FriendsStore: ObservableObject {
         if let data = try? JSONEncoder().encode(me) {
             UserDefaults.standard.set(data, forKey: meKey)
         }
+    }
+
+    @MainActor
+    private func setLastError(_ message: String?) {
+        lastError = message
+    }
+
+    @MainActor
+    private func setFriends(_ values: [FriendProfile]) {
+        friends = values
     }
 
     private func ensureCloudKitAvailable() async throws {
