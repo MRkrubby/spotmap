@@ -29,6 +29,7 @@ struct HomeBottomOverlay: View {
     @StateObject private var places = PlaceSearchViewModel()
     @FocusState private var isSearchFocused: Bool
     @State private var showingSteps = false
+    @State private var showingHomeMenu = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -48,13 +49,12 @@ struct HomeBottomOverlay: View {
                 .environmentObject(nav)
                 .presentationDetents([.medium, .large])
         }
-
         .sheet(isPresented: $showingHomeMenu) {
-    HomeMenuSheet()
-        .environmentObject(friends)
-        .environmentObject(journeys)
-        .presentationDetents([.large])
-}
+            HomeMenuSheet()
+                .environmentObject(friends)
+                .environmentObject(journeys)
+                .presentationDetents([.large])
+        }
     }
 
     // MARK: - Search
@@ -118,21 +118,18 @@ struct HomeBottomOverlay: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.blue)
             }
+            if !isSearchFocused && places.query.isEmpty {
+                Button {
+                    showingHomeMenu = true
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 2)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        
-
-if !isSearchFocused && places.query.isEmpty {
-    Button {
-        showingHomeMenu = true
-    } label: {
-        Image(systemName: "line.3.horizontal")
-            .foregroundStyle(.secondary)
-            .padding(.leading, 2)
-    }
-    .buttonStyle(.plain)
-}
-
-.padding(.vertical, 12)
+        .padding(.vertical, 12)
         .padding(.horizontal, 14)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.10)))
@@ -207,20 +204,7 @@ if !isSearchFocused && places.query.isEmpty {
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
             }
-            
-
-if !isSearchFocused && places.query.isEmpty {
-    Button {
-        showingHomeMenu = true
-    } label: {
-        Image(systemName: "line.3.horizontal")
-            .foregroundStyle(.secondary)
-            .padding(.leading, 2)
-    }
-    .buttonStyle(.plain)
-}
-
-.padding(.vertical, 12)
+            .padding(.vertical, 12)
             .padding(.horizontal, 14)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
@@ -272,20 +256,7 @@ if !isSearchFocused && places.query.isEmpty {
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                
-
-if !isSearchFocused && places.query.isEmpty {
-    Button {
-        showingHomeMenu = true
-    } label: {
-        Image(systemName: "line.3.horizontal")
-            .foregroundStyle(.secondary)
-            .padding(.leading, 2)
-    }
-    .buttonStyle(.plain)
-}
-
-.padding(.vertical, 12)
+                .padding(.vertical, 12)
                 .padding(.horizontal, 14)
                 .background(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)

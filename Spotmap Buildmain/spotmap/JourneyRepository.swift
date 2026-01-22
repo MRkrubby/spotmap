@@ -247,22 +247,15 @@ final class ExploreStore: ObservableObject {
     private func ingestCities(start: CLLocationCoordinate2D, end: CLLocationCoordinate2D) async {
         let geocoder = CLGeocoder()
 
-        func key(from placemark: CLPlacemark?) -> String? {
-            guard let placemark else { return nil }
-            let country = placemark.isoCountryCode ?? placemark.country ?? "??"
-            let locality = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.administrativeArea ?? "Onbekend"
-            return "\(country)|\(locality)"
-        }
-
         let startKey: String? = await withCheckedContinuation { cont in
             geocoder.reverseGeocodeLocation(CLLocation(latitude: start.latitude, longitude: start.longitude)) { places, _ in
-                cont.resume(returning: key(from: places?.first))
+                cont.resume(returning: Self.cityKey(from: places?.first))
             }
         }
 
         let endKey: String? = await withCheckedContinuation { cont in
             geocoder.reverseGeocodeLocation(CLLocation(latitude: end.latitude, longitude: end.longitude)) { places, _ in
-                cont.resume(returning: key(from: places?.first))
+                cont.resume(returning: Self.cityKey(from: places?.first))
             }
         }
 
@@ -273,6 +266,13 @@ final class ExploreStore: ObservableObject {
             visitedCities = set
             Self.saveSet(set, key: citiesKey)
         }
+    }
+
+    nonisolated private static func cityKey(from placemark: CLPlacemark?) -> String? {
+        guard let placemark else { return nil }
+        let country = placemark.isoCountryCode ?? placemark.country ?? "??"
+        let locality = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.administrativeArea ?? "Onbekend"
+        return "\(country)|\(locality)"
     }
 
     func totalDistanceKm(from journeys: [JourneyRecord]) -> Double {
