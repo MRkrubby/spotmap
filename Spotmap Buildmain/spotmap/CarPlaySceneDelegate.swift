@@ -69,6 +69,7 @@ final class CarPlayCoordinator: NSObject {
     private var activeTrip: CPTrip?
     private var activeRoute: MKRoute?
     private var activeDestination: MKMapItem?
+    private var activeSpotRecordName: String?
     private var lastRouteChoices: [MKRoute] = []
 
     // Observers
@@ -107,6 +108,7 @@ final class CarPlayCoordinator: NSObject {
         activeTrip = nil
         activeRoute = nil
         activeDestination = nil
+        activeSpotRecordName = nil
         lastRouteChoices = []
 
         mapTemplate = nil
@@ -192,8 +194,8 @@ final class CarPlayCoordinator: NSObject {
         let items: [CPListItem] = spots.prefix(100).map { spot in
             let item = CPListItem(text: spot.title, detailText: spot.note.isEmpty ? nil : spot.note)
             item.handler = { [weak self] _, completion in
-                self?.previewRoutes(to: MKMapItem(placemark: MKPlacemark(coordinate: self?.coordinate(for: spot) ?? CLLocationCoordinate2D(latitude: 0, longitude: 0))),
-                                   name: spot.title)
+                let destination = MKMapItem(placemark: MKPlacemark(coordinate: spot.location.coordinate))
+                self?.previewRoutes(to: destination, name: spot.title, recordName: spot.id.recordName)
                 completion()
             }
             return item
@@ -220,8 +222,8 @@ final class CarPlayCoordinator: NSObject {
         let items: [CPListItem] = spots.prefix(100).map { spot in
             let item = CPListItem(text: spot.title, detailText: spot.note.isEmpty ? nil : spot.note)
             item.handler = { [weak self] _, completion in
-                self?.previewRoutes(to: MKMapItem(placemark: MKPlacemark(coordinate: self?.coordinate(for: spot) ?? CLLocationCoordinate2D(latitude: 0, longitude: 0))),
-                                   name: spot.title)
+                let destination = MKMapItem(placemark: MKPlacemark(coordinate: spot.location.coordinate))
+                self?.previewRoutes(to: destination, name: spot.title, recordName: spot.id.recordName)
                 completion()
             }
             return item
@@ -244,8 +246,9 @@ final class CarPlayCoordinator: NSObject {
 
     // MARK: - Route preview
 
-    private func previewRoutes(to destination: MKMapItem, name: String?) {
+    private func previewRoutes(to destination: MKMapItem, name: String?, recordName: String? = nil) {
         activeDestination = destination
+        activeSpotRecordName = recordName
 
         // Mirror on the phone engine (so instruction/progress works).
         nav.previewNavigation(to: destination, name: name)
@@ -279,7 +282,11 @@ final class CarPlayCoordinator: NSObject {
 
         let startOnPhone = CPListItem(text: "Open op iPhone", detailText: "Start navigatie in de app")
         startOnPhone.handler = { [weak self] _, completion in
-            self?.openURL("spotmap://navigate")
+            if let recordName = self?.activeSpotRecordName {
+                self?.openURL("spotmap://navigate/spot/\(recordName)")
+            } else {
+                self?.openURL("spotmap://")
+            }
             completion()
         }
 
@@ -332,6 +339,7 @@ final class CarPlayCoordinator: NSObject {
         activeTrip = nil
         activeRoute = nil
         activeDestination = nil
+        activeSpotRecordName = nil
         lastRouteChoices = []
 
         mapVC?.clearOverlays()
@@ -450,32 +458,6 @@ final class CarPlayCoordinator: NSObject {
     private func openURL(_ string: String) {
         guard let url = URL(string: string) else { return }
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
-    }
-}
-
-private extension CarPlayCoordinator {
-    func coordinate(for spot: Any) -> CLLocationCoordinate2D {
-        // Try common patterns without relying on the Spot type directly.
-        // 1) If the spot has a 'location' property of type CLLocation, use its coordinate.
-        if let loc = (spot as AnyObject).value(forKey: "location") as? CLLocation {
-            return loc.coordinate
-        }
-        // 2) If the spot has 'latitude' and 'longitude' Doubles, use them.
-        if let lat = (spot as AnyObject).value(forKey: "latitude") as? Double,
-           let lon = (spot as AnyObject).value(forKey: "longitude") as? Double {
-            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-        }
-        // 3) If the spot has 'lat' and 'lon' Doubles, use them.
-        if let lat = (spot as AnyObject).value(forKey: "lat") as? Double,
-           let lon = (spot as AnyObject).value(forKey: "lon") as? Double {
-            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-        }
-        // 4) If the spot has 'coordinate' as CLLocationCoordinate2D (future-proof), use it.
-        if let coord = (spot as AnyObject).value(forKey: "coordinate") as? CLLocationCoordinate2D {
-            return coord
-        }
-        // Fallback to a neutral coordinate; callers may choose to handle this differently.
-        return CLLocationCoordinate2D(latitude: 0, longitude: 0)
     }
 }
 
@@ -679,4 +661,3 @@ private extension CPMapButton {
         return self
     }
 }
-
