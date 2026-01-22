@@ -310,7 +310,7 @@ if exploreEnabled {
 }
 
 
-            if let dest = nav.destination?.placemark.coordinate {
+            if let dest = nav.destination?.location?.coordinate {
                 Marker(nav.destinationName ?? "Bestemming", coordinate: dest)
             }
 
@@ -363,7 +363,8 @@ if exploreEnabled {
             Task {
                 if let spot = await vm.repo.fetchSpotIfNeeded(recordName: recordName) {
                     let coord = spot.location.coordinate
-                    let item = MKMapItem(placemark: MKPlacemark(coordinate: coord))
+                    let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+                    let item = MKMapItem(location: location, address: nil)
                     item.name = spot.title
 
                     await MainActor.run {

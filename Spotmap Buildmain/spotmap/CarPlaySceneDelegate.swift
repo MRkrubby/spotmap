@@ -195,7 +195,8 @@ final class CarPlayCoordinator: NSObject {
         let items: [CPListItem] = spots.prefix(100).map { spot in
             let item = CPListItem(text: spot.title, detailText: spot.note.isEmpty ? nil : spot.note)
             item.handler = { [weak self] _, completion in
-                let destination = MKMapItem(placemark: MKPlacemark(coordinate: spot.location.coordinate))
+                let location = CLLocation(latitude: spot.location.coordinate.latitude, longitude: spot.location.coordinate.longitude)
+                let destination = MKMapItem(location: location, address: nil)
                 self?.previewRoutes(to: destination, name: spot.title, recordName: spot.id.recordName)
                 completion()
             }
@@ -223,7 +224,8 @@ final class CarPlayCoordinator: NSObject {
         let items: [CPListItem] = spots.prefix(100).map { spot in
             let item = CPListItem(text: spot.title, detailText: spot.note.isEmpty ? nil : spot.note)
             item.handler = { [weak self] _, completion in
-                let destination = MKMapItem(placemark: MKPlacemark(coordinate: spot.location.coordinate))
+                let location = CLLocation(latitude: spot.location.coordinate.latitude, longitude: spot.location.coordinate.longitude)
+                let destination = MKMapItem(location: location, address: nil)
                 self?.previewRoutes(to: destination, name: spot.title, recordName: spot.id.recordName)
                 completion()
             }
@@ -498,7 +500,7 @@ extension CarPlayCoordinator: CPSearchTemplateDelegate {
                 let response = try await MKLocalSearch(request: request).start()
                 let items = response.mapItems.prefix(10).map { item -> CPListItem in
                     let title = item.name ?? "Resultaat"
-                    let subtitle = item.placemark.title
+                    let subtitle = item.addressRepresentations?.fullAddress(includingRegion: true, singleLine: true)
                     let listItem = CPListItem(text: title, detailText: subtitle)
                     listItem.handler = { [weak self] _, completion in
                         self?.previewRoutes(to: item, name: title)
@@ -602,7 +604,9 @@ final class CarPlayMapViewController: UIViewController, MKMapViewDelegate {
 
         let ann = MKPointAnnotation()
         ann.title = destination.name
-        ann.coordinate = destination.placemark.coordinate
+        if let coord = destination.location?.coordinate {
+            ann.coordinate = coord
+        }
         mapView.addAnnotation(ann)
 
         for r in routes.prefix(3) {
@@ -616,7 +620,9 @@ final class CarPlayMapViewController: UIViewController, MKMapViewDelegate {
         clearOverlays()
         let ann = MKPointAnnotation()
         ann.title = destination.name
-        ann.coordinate = destination.placemark.coordinate
+        if let coord = destination.location?.coordinate {
+            ann.coordinate = coord
+        }
         mapView.addAnnotation(ann)
         mapView.addOverlay(route.polyline)
         zoomToFit(routes: [route], destination: destination)
@@ -625,9 +631,11 @@ final class CarPlayMapViewController: UIViewController, MKMapViewDelegate {
     private func zoomToFit(routes: [MKRoute], destination: MKMapItem) {
         let polylines = routes.prefix(3).map { $0.polyline }
         guard let first = polylines.first else {
-            let region = MKCoordinateRegion(center: destination.placemark.coordinate,
-                                            span: MKCoordinateSpan(latitudeDelta: 0.25, longitudeDelta: 0.25))
-            mapView.setRegion(region, animated: true)
+            if let coord = destination.location?.coordinate {
+                let region = MKCoordinateRegion(center: coord,
+                                                span: MKCoordinateSpan(latitudeDelta: 0.25, longitudeDelta: 0.25))
+                mapView.setRegion(region, animated: true)
+            }
             return
         }
         var mapRect = first.boundingMapRect

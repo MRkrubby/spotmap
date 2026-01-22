@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import Combine
+import MapKit
 
 /// Stores and records journeys (trip logging).
 ///
@@ -246,19 +247,8 @@ final class ExploreStore: ObservableObject {
     }
 
     private func ingestCities(start: CLLocationCoordinate2D, end: CLLocationCoordinate2D) async {
-        let geocoder = CLGeocoder()
-
-        let startKey: String? = await withCheckedContinuation { cont in
-            geocoder.reverseGeocodeLocation(CLLocation(latitude: start.latitude, longitude: start.longitude)) { places, _ in
-                cont.resume(returning: Self.cityKey(from: places?.first))
-            }
-        }
-
-        let endKey: String? = await withCheckedContinuation { cont in
-            geocoder.reverseGeocodeLocation(CLLocation(latitude: end.latitude, longitude: end.longitude)) { places, _ in
-                cont.resume(returning: Self.cityKey(from: places?.first))
-            }
-        }
+        let startKey = await Self.cityKey(from: start)
+        let endKey = await Self.cityKey(from: end)
 
         await MainActor.run {
             var set = visitedCities
@@ -269,11 +259,18 @@ final class ExploreStore: ObservableObject {
         }
     }
 
-    nonisolated private static func cityKey(from placemark: CLPlacemark?) -> String? {
-        guard let placemark else { return nil }
-        let country = placemark.isoCountryCode ?? placemark.country ?? "??"
-        let locality = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.administrativeArea ?? "Onbekend"
-        return "\(country)|\(locality)"
+    nonisolated private static func cityKey(from coordinate: CLLocationCoordinate2D) async -> String? {
+        let request = MKReverseGeocodingRequest(location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+        let mapItem: MKMapItem? = await withCheckedContinuation { cont in
+            request.getMapItems { items, _ in
+                cont.resume(returning: items?.first)
+            }
+        }
+
+        guard let representations = mapItem?.addressRepresentations else { return nil }
+        let region = representations.regionName ?? "??"
+        let city = representations.cityName ?? "Onbekend"
+        return "\(region)|\(city)"
     }
 
     func totalDistanceKm(from journeys: [JourneyRecord]) -> Double {
