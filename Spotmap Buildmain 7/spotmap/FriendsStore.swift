@@ -176,14 +176,27 @@ final class FriendsStore: ObservableObject {
                 return
             }
 
-            var loaded: [FriendProfile] = []
-            for code in codes {
-                let rid = CKRecord.ID(recordName: "friend-\(code)")
-                if let record = try? await db.record(for: rid) {
-                    loaded.append(Self.decode(record))
+            let recordIDs = codes.map { CKRecord.ID(recordName: "friend-\($0)") }
+            let existingByCode = Dictionary(uniqueKeysWithValues: friends.map { ($0.code.uppercased(), $0) })
+            let fetchResult = try await fetchFriendRecords(recordIDs, from: db)
+            var loadedByCode: [String: FriendProfile] = [:]
+            for record in fetchResult.records.values {
+                let profile = Self.decode(record)
+                loadedByCode[profile.code.uppercased()] = profile
+            }
+            if !fetchResult.failures.isEmpty {
+                setLastError("Some friends could not be refreshed.")
+            }
+
+            var merged: [FriendProfile] = []
+            for code in codes.map({ $0.uppercased() }) {
+                if let updated = loadedByCode[code] {
+                    merged.append(updated)
+                } else if let existing = existingByCode[code] {
+                    merged.append(existing)
                 }
             }
-            let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
+            let sorted = merged.sorted(by: { $0.displayName < $1.displayName })
             setFriends(sorted)
         } catch {
             setLastError(error.localizedDescription)
@@ -293,6 +306,43 @@ final class FriendsStore: ObservableObject {
             default:
                 break
             }
+        }
+    }
+
+    private func fetchFriendRecords(
+        _ recordIDs: [CKRecord.ID],
+        from database: CKDatabase
+    ) async throws -> (records: [CKRecord.ID: CKRecord], failures: [CKRecord.ID: Error]) {
+        try await withCheckedThrowingContinuation { continuation in
+            var recordsByID: [CKRecord.ID: CKRecord] = [:]
+            var failures: [CKRecord.ID: Error] = [:]
+            let operation = CKFetchRecordsOperation(recordIDs: recordIDs)
+            operation.perRecordResultBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    recordsByID[recordID] = record
+                case .failure(let error):
+                    failures[recordID] = error
+                }
+            }
+            operation.fetchRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: (recordsByID, failures))
+                case .failure(let error):
+                    if let ckError = error as? CKError, ckError.code == .partialFailure {
+                        if let partialErrors = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] {
+                            for (recordID, partialError) in partialErrors {
+                                failures[recordID] = partialError
+                            }
+                        }
+                        continuation.resume(returning: (recordsByID, failures))
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            database.add(operation)
         }
     }
 
