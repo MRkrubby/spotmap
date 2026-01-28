@@ -13,6 +13,7 @@ struct DriveDashboardView: View {
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var showingJourneys = false
     @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
 
     var body: some View {
         ZStack {
@@ -35,6 +36,8 @@ struct DriveDashboardView: View {
     }
 
     private var mapLayer: some View {
+        let style = UserLocationStyle.from(rawValue: userLocationStyleRaw)
+        let asset = VehicleAssetsCatalog.shared.asset(for: userLocationAssetId)
         Map(position: $mapPosition) {
             let coords = journeys.currentPolyline()
             if coords.count >= 2 {
@@ -48,7 +51,7 @@ struct DriveDashboardView: View {
                     .stroke(.orange, lineWidth: 6)
             }
             UserAnnotation {
-                UserLocationMarkerView(style: UserLocationStyle.from(rawValue: userLocationStyleRaw))
+                UserLocationMarkerView(style: style, asset: asset)
             }
         }
         .mapStyle(.standard)

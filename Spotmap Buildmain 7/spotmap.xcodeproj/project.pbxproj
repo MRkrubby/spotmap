@@ -10,6 +10,7 @@
 		1E8618E418E44EECA3866703 /* spotmap/CloudAssets/StylizedCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F86DEB9E38E949B39BFA8885 /* spotmap/CloudAssets/StylizedCloud.usdz */; };
 		44CBC4A79E4B498592CF5DE1 /* spotmap/TreeAssets/LowPolyTrees.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 39F9EDAC788C4ACABF0D27B3 /* spotmap/TreeAssets/LowPolyTrees.usdz */; };
 		5561F80C1AD242D4B0389F12 /* spotmap/CloudAssets/CartoonCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F2F8CCF6697D424583CC0817 /* spotmap/CloudAssets/CartoonCloud.usdz */; };
+		A2B3C4D5E6F708192A3B4001 /* spotmap/VehicleAssets/vehicle_assets.json in Resources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F708192A3B4002 /* spotmap/VehicleAssets/vehicle_assets.json */; };
 		B86F9F1F33034475888CAADA /* spotmap/CloudAssets/TinyCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = FD866495C14941E2A063FFE5 /* spotmap/CloudAssets/TinyCloud.usdz */; };
 /* End PBXBuildFile section */
 
@@ -17,6 +18,7 @@
 		108763122F2293900095CE68 /* spotmap.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = spotmap.xctestplan; sourceTree = "<group>"; };
 		10EB1E8B2F20354B00A95F3D /* spotmap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = spotmap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		39F9EDAC788C4ACABF0D27B3 /* spotmap/TreeAssets/LowPolyTrees.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/TreeAssets/LowPolyTrees.usdz; sourceTree = "<group>"; };
+		A2B3C4D5E6F708192A3B4002 /* spotmap/VehicleAssets/vehicle_assets.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = spotmap/VehicleAssets/vehicle_assets.json; sourceTree = "<group>"; };
 		F1A1B2C3D4E5F60718293A01 /* Config/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Config/Info.plist; sourceTree = "<group>"; };
 		F2F8CCF6697D424583CC0817 /* spotmap/CloudAssets/CartoonCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/CloudAssets/CartoonCloud.usdz; sourceTree = "<group>"; };
 		F86DEB9E38E949B39BFA8885 /* spotmap/CloudAssets/StylizedCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/CloudAssets/StylizedCloud.usdz; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 				F2F8CCF6697D424583CC0817 /* spotmap/CloudAssets/CartoonCloud.usdz */,
 				FD866495C14941E2A063FFE5 /* spotmap/CloudAssets/TinyCloud.usdz */,
 				39F9EDAC788C4ACABF0D27B3 /* spotmap/TreeAssets/LowPolyTrees.usdz */,
+				A2B3C4D5E6F708192A3B4002 /* spotmap/VehicleAssets/vehicle_assets.json */,
 			);
 			name = BundledAssets;
 			sourceTree = "<group>";
@@ -141,6 +144,7 @@
 				5561F80C1AD242D4B0389F12 /* spotmap/CloudAssets/CartoonCloud.usdz in Resources */,
 				B86F9F1F33034475888CAADA /* spotmap/CloudAssets/TinyCloud.usdz in Resources */,
 				44CBC4A79E4B498592CF5DE1 /* spotmap/TreeAssets/LowPolyTrees.usdz in Resources */,
+				A2B3C4D5E6F708192A3B4001 /* spotmap/VehicleAssets/vehicle_assets.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

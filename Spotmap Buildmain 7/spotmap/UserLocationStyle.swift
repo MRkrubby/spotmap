@@ -28,6 +28,11 @@ enum UserLocationStyle: String, CaseIterable, Identifiable {
             return "car.2.fill"
         }
     }
+
+    func mapImage(for asset: VehicleAsset?) -> UIImage? {
+        guard self == .assetPack, let asset else { return nil }
+        return asset.mapImage ?? asset.fallbackImage
+    }
 }
 
 extension UserLocationStyle {
@@ -38,6 +43,7 @@ extension UserLocationStyle {
 
 struct UserLocationMarkerView: View {
     let style: UserLocationStyle
+    let asset: VehicleAsset?
 
     var body: some View {
         ZStack {
@@ -47,10 +53,18 @@ struct UserLocationMarkerView: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.18)))
                 .shadow(radius: 6)
 
-            Image(systemName: style.systemImageName)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.white)
-                .accessibilityLabel(Text(style.displayName))
+            if let image = style.mapImage(for: asset) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 36, height: 36)
+                    .accessibilityLabel(Text(asset?.displayName ?? style.displayName))
+            } else {
+                Image(systemName: style.systemImageName)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.white)
+                    .accessibilityLabel(Text(style.displayName))
+            }
         }
     }
 }

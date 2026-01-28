@@ -13,8 +13,10 @@ struct SettingsView: View {
     @AppStorage("Friends.enabled") private var friendsEnabled: Bool = true
     @AppStorage("Friends.displayName") private var friendsDisplayName: String = "Ik"
     @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
 
     var body: some View {
+        let vehicleAssets = VehicleAssetsCatalog.shared.assets
         NavigationStack {
             Form {
                 Section("Tracking") {
@@ -40,9 +42,23 @@ struct SettingsView: View {
                             Text(style.displayName).tag(style.rawValue)
                         }
                     }
-                    Text("Kies een persoonlijke auto of een asset-pack icoon om je locatie te personaliseren tijdens het rijden.")
+                    Text("Kies een persoonlijke auto of een voertuig uit het asset pack om je locatie te personaliseren tijdens het rijden.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
+                    if UserLocationStyle.from(rawValue: userLocationStyleRaw) == .assetPack {
+                        if vehicleAssets.isEmpty {
+                            Text("Geen vehicle assets gevonden in VehicleAssets/vehicle_assets.json.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("Voertuig", selection: $userLocationAssetId) {
+                                ForEach(vehicleAssets) { asset in
+                                    Text(asset.displayName).tag(asset.id)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Section("Backend") {

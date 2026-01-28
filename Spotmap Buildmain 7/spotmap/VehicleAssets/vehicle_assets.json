@@ -1,0 +1,20 @@
+[
+  {
+    "id": "personal-sedan",
+    "displayName": "Persoonlijke sedan",
+    "iconName": "car.fill",
+    "mapAssetName": "vehicle_sedan"
+  },
+  {
+    "id": "personal-suv",
+    "displayName": "Persoonlijke SUV",
+    "iconName": "car.2.fill",
+    "mapAssetName": "vehicle_suv"
+  },
+  {
+    "id": "personal-sport",
+    "displayName": "Persoonlijke sportwagen",
+    "iconName": "car.circle.fill",
+    "mapAssetName": "vehicle_sport"
+  }
+]
