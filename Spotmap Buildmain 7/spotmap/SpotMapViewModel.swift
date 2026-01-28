@@ -71,18 +71,18 @@ final class SpotMapViewModel: ObservableObject {
     }
 
     func handleDeepLink(_ url: URL) {
-        // spotmap://spot/<recordName>
-        guard url.scheme == "spotmap" else { return }
-        let parts = url.pathComponents // ["/", "spot", "<id>"]
-        guard parts.count >= 3, parts[1] == "spot" else { return }
-        let recordName = parts[2]
+        guard let deepLink = DeepLink(url: url) else { return }
 
-        Task {
-            if let spot = await repo.fetchSpotIfNeeded(recordName: recordName) {
-                selectedSpot = spot
-                focus(on: spot.location.coordinate)
+        switch deepLink {
+        case .spot(let recordName):
+            Task {
+                if let spot = await repo.fetchSpotIfNeeded(recordName: recordName) {
+                    selectedSpot = spot
+                    focus(on: spot.location.coordinate)
+                }
             }
+        default:
+            break
         }
     }
 }
-

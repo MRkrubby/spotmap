@@ -122,6 +122,8 @@ final class SpotRepository: ObservableObject {
             cache.save(fetched)
         } catch is CancellationError {
             // Expected when the user pans/zooms quickly.
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
         } catch {
             lastErrorMessage = humanReadable(error: error)
         }
@@ -133,6 +135,7 @@ final class SpotRepository: ObservableObject {
         isLoading = true
         lastErrorMessage = nil
         defer { isLoading = false }
+        let previousSpots = spots
 
         // Note: Spot initializer doesn't accept photoData; handle image persistence inside the service if needed.
         let spot = Spot(
@@ -148,7 +151,13 @@ final class SpotRepository: ObservableObject {
             }
             spots.insert(saved, at: 0)
             cache.save(spots)
+        } catch is CancellationError {
+            // Ignore cancellations from fast user interactions.
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
         } catch {
+            spots = previousSpots
+            cache.save(previousSpots)
             lastErrorMessage = humanReadable(error: error)
         }
     }
@@ -170,6 +179,12 @@ final class SpotRepository: ObservableObject {
             spots.insert(spot, at: 0)
             cache.save(spots)
             return spot
+        } catch is CancellationError {
+            // Ignore cancellations from fast user interactions.
+            return nil
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
+            return nil
         } catch {
             lastErrorMessage = humanReadable(error: error)
             return nil
@@ -180,6 +195,7 @@ final class SpotRepository: ObservableObject {
         isLoading = true
         lastErrorMessage = nil
         defer { isLoading = false }
+        let previousSpots = spots
 
         do {
             try await withTimeout(seconds: refreshTimeoutSeconds) {
@@ -187,7 +203,13 @@ final class SpotRepository: ObservableObject {
             }
             spots.removeAll { $0.id.recordName == spot.id.recordName }
             cache.save(spots)
+        } catch is CancellationError {
+            // Ignore cancellations from fast user interactions.
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
         } catch {
+            spots = previousSpots
+            cache.save(previousSpots)
             lastErrorMessage = humanReadable(error: error)
         }
     }
@@ -195,27 +217,7 @@ final class SpotRepository: ObservableObject {
     // MARK: - Error mapping
 
     private func humanReadable(error: Error) -> String {
-        if let e = error as? CloudKitSpotService.ServiceError {
-            return e.localizedDescription
-        }
-
-        // Provide slightly friendlier hints for common CloudKit issues.
-        if let ck = error as? CKError {
-            switch ck.code {
-            case .notAuthenticated:
-                return "Je bent niet ingelogd in iCloud. Log in op je iPhone via Instellingen → Apple ID → iCloud."
-            case .permissionFailure:
-                return "Geen toestemming voor CloudKit. Zet iCloud → CloudKit aan bij Signing & Capabilities en kies een container."
-            case .networkUnavailable, .networkFailure:
-                return "Geen netwerkverbinding. Probeer het opnieuw wanneer je internet hebt."
-            case .zoneNotFound:
-                return "CloudKit zone niet gevonden. Controleer of je CloudKit container bestaat in de Apple Developer console."
-            default:
-                break
-            }
-        }
-
-        return "Er ging iets mis: \(error.localizedDescription)"
+        AppErrorMapper.message(for: error)
     }
 }
 
@@ -314,4 +316,3 @@ extension SpotRepository {
         return mgr.location
     }
 }
-

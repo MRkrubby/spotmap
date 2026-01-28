@@ -13,6 +13,9 @@ struct RootTabView: View {
     @StateObject private var journeys = JourneyRepository()
     @StateObject private var nav = NavigationManager()
     @StateObject private var friends = FriendsStore()
+    @State private var isAutoRefreshRunning = false
+
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView {
@@ -30,15 +33,19 @@ struct RootTabView: View {
             // Don't auto-publish unless enabled (avoids CloudKit calls on setups without entitlements).
             friends.setDisplayName(friendsDisplayName)
             if friendsEnabled {
-                friends.startAutoRefresh()
+                startAutoRefreshIfNeeded()
                 Task { await friends.publish() }
             } else {
-                friends.stopAutoRefresh()
+                stopAutoRefreshIfNeeded()
             }
         }
         .onChange(of: friendsEnabled) { _, v in
             friends.isEnabled = v
-            if !v { friends.stopAutoRefresh() } else { friends.startAutoRefresh() }
+            if !v {
+                stopAutoRefreshIfNeeded()
+            } else if scenePhase == .active {
+                startAutoRefreshIfNeeded()
+            }
             Task { await friends.publish() }
         }
         .onChange(of: friendsDisplayName) { _, v in
@@ -47,5 +54,29 @@ struct RootTabView: View {
                 Task { await friends.publish() }
             }
         }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                if friendsEnabled {
+                    startAutoRefreshIfNeeded()
+                }
+            case .inactive, .background:
+                stopAutoRefreshIfNeeded()
+            @unknown default:
+                stopAutoRefreshIfNeeded()
+            }
+        }
+    }
+
+    private func startAutoRefreshIfNeeded() {
+        guard !isAutoRefreshRunning else { return }
+        friends.startAutoRefresh()
+        isAutoRefreshRunning = true
+    }
+
+    private func stopAutoRefreshIfNeeded() {
+        guard isAutoRefreshRunning else { return }
+        friends.stopAutoRefresh()
+        isAutoRefreshRunning = false
     }
 }

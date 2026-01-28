@@ -3,14 +3,9 @@ import MapKit
 
 enum FriendRouteDecoder {
     static func polyline(fromZlib data: Data) -> MKPolyline? {
-        do {
-            let raw = try JourneyCompression.decompress(data)
-            let points = try JSONDecoder().decode([JourneyPoint].self, from: raw)
-            let coords = points.map { $0.coordinate }
-            return MKPolyline(coordinates: coords, count: coords.count)
-        } catch {
-            return nil
-        }
+        guard let points = JourneySerialization.decodePoints(fromZlib: data) else { return nil }
+        let coords = points.map { $0.coordinate }
+        return MKPolyline(coordinates: coords, count: coords.count)
     }
 }
 
