@@ -17,19 +17,27 @@ final class SpotPhotoStore {
         "spot-\(recordName).jpg"
     }
 
+    func uniqueFilename(for recordName: String) -> String {
+        "spot-\(recordName)-\(UUID().uuidString).jpg"
+    }
+
+    func url(for filename: String) -> URL {
+        directoryURL.appendingPathComponent(filename)
+    }
+
     func loadPhotoData(filename: String) -> Data? {
-        let url = directoryURL.appendingPathComponent(filename)
+        let url = url(for: filename)
         return try? Data(contentsOf: url)
     }
 
     func savePhotoData(_ data: Data, filename: String) {
         ensureDirectoryExists()
-        let url = directoryURL.appendingPathComponent(filename)
+        let url = url(for: filename)
         try? data.write(to: url, options: [.atomic])
     }
 
     func deletePhoto(filename: String) {
-        let url = directoryURL.appendingPathComponent(filename)
+        let url = url(for: filename)
         try? fileManager.removeItem(at: url)
     }
 

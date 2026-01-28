@@ -21,14 +21,16 @@ public struct Spot: Identifiable, Equatable, Hashable {
                 title: String,
                 note: String,
                 location: CLLocation,
-                createdAt: Date = Date()) {
+                createdAt: Date = Date(),
+                photoData: Data? = nil,
+                photoAssetURL: URL? = nil) {
         self.id = id
         self.title = title
         self.note = note
         self.location = location
         self.createdAt = createdAt
-        self.photoData = nil
-        self.photoAssetURL = nil
+        self.photoData = photoData
+        self.photoAssetURL = photoAssetURL
     }
 
     public init?(record: CKRecord) {
