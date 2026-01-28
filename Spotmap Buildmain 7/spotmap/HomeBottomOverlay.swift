@@ -385,6 +385,14 @@ struct HomeMenuSheet: View {
     @State private var addFriendCode: String = ""
     @State private var showingAddFriend = false
 
+    private var trimmedAddFriendCode: String {
+        addFriendCode.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isAddFriendCodeValid: Bool {
+        trimmedAddFriendCode.count >= 6
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -510,14 +518,21 @@ struct HomeMenuSheet: View {
             .alert("Vriend toevoegen", isPresented: $showingAddFriend) {
                 TextField("Friend code", text: $addFriendCode)
                 Button("Toevoegen") {
-                    friends.follow(code: addFriendCode)
+                    friends.follow(code: trimmedAddFriendCode)
                     addFriendCode = ""
                 }
+                .disabled(!isAddFriendCodeValid)
                 Button("Cancel", role: .cancel) { addFriendCode = "" }
             } message: {
-                Text("Vraag je vriend om zijn/haar code en plak hem hier.")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Vraag je vriend om zijn/haar code en plak hem hier.")
+                    if !trimmedAddFriendCode.isEmpty && !isAddFriendCodeValid {
+                        Text("Code moet minimaal 6 tekens zijn.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }
 }
-
