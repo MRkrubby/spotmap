@@ -120,7 +120,8 @@ struct SpotMapView: View {
                 showingSpotsList: $showingSpotsList,
                 showingSettings: $showingSettings,
                 showingJourneysSheet: $showingJourneysSheet,
-                showingAchievements: $showingAchievements
+                showingAchievements: $showingAchievements,
+                selection: $selection
             )
 
             .onReceive(vm.locationManager.$lastLocation.compactMap { $0 }) { loc in
@@ -627,11 +628,12 @@ private struct SpotMapSheetPresenter: ViewModifier {
     @Binding var showingSettings: Bool
     @Binding var showingJourneysSheet: Bool
     @Binding var showingAchievements: Bool
+    @Binding var selection: String?
 
     func body(content: Content) -> some View {
         content
             // Spot detail
-            .sheet(item: $vm.selectedSpot) { spot in
+            .sheet(item: $vm.selectedSpot, onDismiss: { selection = nil }) { spot in
                 SpotDetailView(spot: spot, isShareEnabled: vm.repo.backend == .cloudKit)
                     .environmentObject(vm.repo)
                     .environmentObject(nav)
@@ -689,7 +691,8 @@ private extension View {
         showingSpotsList: Binding<Bool>,
         showingSettings: Binding<Bool>,
         showingJourneysSheet: Binding<Bool>,
-        showingAchievements: Binding<Bool>
+        showingAchievements: Binding<Bool>,
+        selection: Binding<String?>
     ) -> some View {
         modifier(
             SpotMapSheetPresenter(
@@ -697,7 +700,8 @@ private extension View {
                 showingSpotsList: showingSpotsList,
                 showingSettings: showingSettings,
                 showingJourneysSheet: showingJourneysSheet,
-                showingAchievements: showingAchievements
+                showingAchievements: showingAchievements,
+                selection: selection
             )
         )
     }
