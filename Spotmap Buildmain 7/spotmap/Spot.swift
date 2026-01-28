@@ -62,10 +62,17 @@ public struct Spot: Identifiable, Equatable, Hashable {
         record["createdAt"] = createdAt as CKRecordValue
 
         if let photoData {
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("spot-photo-\(id.recordName).jpg")
-            try? photoData.write(to: url, options: [.atomic])
-            record["photo"] = CKAsset(fileURL: url)
-            return (record, url)
+            let tempFilename = "spot-photo-\(id.recordName)-\(UUID().uuidString).jpg"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(tempFilename)
+            do {
+                try photoData.write(to: url, options: [.atomic])
+                record["photo"] = CKAsset(fileURL: url)
+                return (record, url)
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                record["photo"] = nil
+                return (record, nil)
+            }
         } else {
             record["photo"] = nil
             return (record, nil)
