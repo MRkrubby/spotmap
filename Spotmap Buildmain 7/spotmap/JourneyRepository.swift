@@ -514,6 +514,14 @@ final class ExploreStore: ObservableObject {
     private let tilesKey = "ExploreTiles.v1"
     private let citiesKey = "ExploreCities.v1"
     private let zoom = 10
+    private let geocodeTileZoom = 8
+    private let geocodeCooldown: TimeInterval = 60 * 30
+    private var geocodeCache: [String: GeocodeCacheEntry] = [:]
+
+    private struct GeocodeCacheEntry {
+        let lastLookup: Date
+        let cityKey: String?
+    }
 
     private init() {
         visitedTiles = Self.loadSet(key: tilesKey)
@@ -542,18 +550,8 @@ final class ExploreStore: ObservableObject {
 
     private func ingestCities(start: CLLocationCoordinate2D, end: CLLocationCoordinate2D) async {
         let geocoder = CLGeocoder()
-
-        let startKey: String? = await withCheckedContinuation { cont in
-            geocoder.reverseGeocodeLocation(CLLocation(latitude: start.latitude, longitude: start.longitude)) { places, _ in
-                cont.resume(returning: Self.cityKey(from: places?.first))
-            }
-        }
-
-        let endKey: String? = await withCheckedContinuation { cont in
-            geocoder.reverseGeocodeLocation(CLLocation(latitude: end.latitude, longitude: end.longitude)) { places, _ in
-                cont.resume(returning: Self.cityKey(from: places?.first))
-            }
-        }
+        let startKey = await geocodeCityKey(for: start, using: geocoder)
+        let endKey = await geocodeCityKey(for: end, using: geocoder)
 
         await MainActor.run {
             var set = visitedCities
@@ -562,6 +560,30 @@ final class ExploreStore: ObservableObject {
             visitedCities = set
             Self.saveSet(set, key: citiesKey)
         }
+    }
+
+    private func geocodeCityKey(for coordinate: CLLocationCoordinate2D, using geocoder: CLGeocoder) async -> String? {
+        let tileKey = Self.tileId(lat: coordinate.latitude, lon: coordinate.longitude, zoom: geocodeTileZoom)
+        let now = Date()
+        let cachedEntry = await MainActor.run { geocodeCache[tileKey] }
+        if let cachedEntry, now.timeIntervalSince(cachedEntry.lastLookup) < geocodeCooldown {
+            return cachedEntry.cityKey
+        }
+        let fallbackCityKey = cachedEntry?.cityKey
+        let resolvedKey: String? = await withCheckedContinuation { cont in
+            geocoder.reverseGeocodeLocation(CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)) { places, error in
+                if error != nil {
+                    cont.resume(returning: fallbackCityKey)
+                    return
+                }
+                let cityKey = Self.cityKey(from: places?.first) ?? fallbackCityKey
+                cont.resume(returning: cityKey)
+            }
+        }
+        await MainActor.run {
+            geocodeCache[tileKey] = GeocodeCacheEntry(lastLookup: now, cityKey: resolvedKey ?? fallbackCityKey)
+        }
+        return resolvedKey ?? fallbackCityKey
     }
 
     nonisolated private static func cityKey(from placemark: CLPlacemark?) -> String? {
