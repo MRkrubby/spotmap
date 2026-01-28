@@ -8,6 +8,7 @@ import CoreLocation
 /// when CloudKit is unavailable.
 final class LocalSpotService: SpotService {
     private let key = "LocalSpots.v1"
+    private let photoStore = SpotPhotoStore.shared
 
     static func makeRecordNameIfNeeded(forBackend backend: SpotRepository.Backend) -> String {
         switch backend {
@@ -59,14 +60,27 @@ final class LocalSpotService: SpotService {
     // MARK: - Storage
 
     @MainActor private func load() -> [Spot] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([CacheSpot].self, from: data))?.map { $0.toSpot() } ?? []
+        loadCacheSpots().map { $0.toSpot(photoStore: photoStore) }
     }
 
     @MainActor private func persist(_ spots: [Spot]) {
-        let enc = spots.map(CacheSpot.init)
+        let previous = loadCacheSpots()
+        let enc = spots.map { CacheSpot($0, photoStore: photoStore) }
         guard let data = try? JSONEncoder().encode(enc) else { return }
         UserDefaults.standard.set(data, forKey: key)
+        removeOrphanedPhotos(previous: previous, current: enc)
+    }
+
+    @MainActor private func loadCacheSpots() -> [CacheSpot] {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([CacheSpot].self, from: data)) ?? []
+    }
+
+    private func removeOrphanedPhotos(previous: [CacheSpot], current: [CacheSpot]) {
+        let currentFiles = Set(current.compactMap(\.photoFilename))
+        let previousFiles = Set(previous.compactMap(\.photoFilename))
+        let orphaned = previousFiles.subtracting(currentFiles)
+        orphaned.forEach { photoStore.deletePhoto(filename: $0) }
     }
 
     private struct CacheSpot: Codable {
@@ -76,19 +90,25 @@ final class LocalSpotService: SpotService {
         let lat: Double
         let lon: Double
         let createdAt: Date
-        let photoData: Data?
+        let photoFilename: String?
 
-        init(_ spot: Spot) {
+        init(_ spot: Spot, photoStore: SpotPhotoStore) {
             recordName = spot.id.recordName
             title = spot.title
             note = spot.note
             lat = spot.latitude
             lon = spot.longitude
             createdAt = spot.createdAt
-            photoData = spot.photoData
+            if let photoData = spot.photoData {
+                let filename = photoStore.filename(for: recordName)
+                photoStore.savePhotoData(photoData, filename: filename)
+                photoFilename = filename
+            } else {
+                photoFilename = nil
+            }
         }
 
-        func toSpot() -> Spot {
+        func toSpot(photoStore: SpotPhotoStore) -> Spot {
             var spot = Spot(
                 id: CKRecord.ID(recordName: recordName),
                 title: title,
@@ -96,7 +116,9 @@ final class LocalSpotService: SpotService {
                 location: CLLocation(latitude: lat, longitude: lon),
                 createdAt: createdAt
             )
-            spot.photoData = photoData
+            if let photoFilename {
+                spot.photoData = photoStore.loadPhotoData(filename: photoFilename)
+            }
             return spot
         }
     }
