@@ -12,6 +12,7 @@ struct DriveDashboardView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var showingJourneys = false
+    @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
 
     var body: some View {
         ZStack {
@@ -46,7 +47,9 @@ struct DriveDashboardView: View {
                 MapPolyline(r.polyline)
                     .stroke(.orange, lineWidth: 6)
             }
-            UserAnnotation()
+            UserAnnotation {
+                UserLocationMarkerView(style: UserLocationStyle.from(rawValue: userLocationStyleRaw))
+            }
         }
         .mapStyle(.standard)
         .onChange(of: journeys.currentPolyline().count) { _, _ in

@@ -521,6 +521,7 @@ private struct SpotMapMapLayer: View {
     @Binding var selection: String?
     @ObservedObject var coordinator: SpotMapCoordinator
     @ObservedObject var fogCloudField: FogCloudField
+    @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
 
     var body: some View {
         MapReader { proxy in
@@ -563,7 +564,9 @@ private struct SpotMapMapLayer: View {
                                 .tag(spot.id.recordName)
                         }
 
-                        UserAnnotation()
+                        UserAnnotation {
+                            UserLocationMarkerView(style: UserLocationStyle.from(rawValue: userLocationStyleRaw))
+                        }
                     }
                     .mapStyle(exploreEnabled ? .standard(elevation: .flat) : .standard)
                     .mapControls {
@@ -817,4 +820,3 @@ final class SpotMapCoordinator: ObservableObject {
         }
     }
 }
-

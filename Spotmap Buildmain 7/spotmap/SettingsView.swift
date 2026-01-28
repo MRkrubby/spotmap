@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("Explore.enabled") private var exploreEnabled: Bool = false
     @AppStorage("Friends.enabled") private var friendsEnabled: Bool = true
     @AppStorage("Friends.displayName") private var friendsDisplayName: String = "Ik"
+    @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,17 @@ struct SettingsView: View {
                     Button("Vraag locatie-toestemming opnieuw") {
                         journeys.requestPermissionsIfNeeded()
                     }
+                }
+
+                Section("Locatie-stijl") {
+                    Picker("Jouw icoon", selection: $userLocationStyleRaw) {
+                        ForEach(UserLocationStyle.allCases) { style in
+                            Text(style.displayName).tag(style.rawValue)
+                        }
+                    }
+                    Text("Kies een persoonlijke auto of een asset-pack icoon om je locatie te personaliseren tijdens het rijden.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Backend") {
