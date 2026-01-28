@@ -41,6 +41,7 @@ final class NavigationManager: NSObject, ObservableObject {
 
     private let rerouteThresholdMeters: Double = 35
     private let stepAdvanceThresholdMeters: Double = 25
+    private let rerouteCooldownSeconds: TimeInterval = 8
 
     // MARK: - Private
 
@@ -56,6 +57,8 @@ final class NavigationManager: NSObject, ObservableObject {
 
     private var activeDirections: MKDirections? = nil
     private var calculateTask: Task<Void, Never>? = nil
+    private var rerouteTask: Task<Void, Never>? = nil
+    private var lastRerouteAt: Date? = nil
 
     override init() {
         super.init()
@@ -181,6 +184,28 @@ final class NavigationManager: NSObject, ObservableObject {
         }
     }
 
+    private func scheduleReroute(to item: MKMapItem) {
+        rerouteTask?.cancel()
+
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastRerouteAt ?? .distantPast)
+        let delay = max(0, rerouteCooldownSeconds - elapsed)
+
+        rerouteTask = Task { [weak self] @MainActor in
+            guard let self else { return }
+            if delay > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                } catch {
+                    return
+                }
+            }
+            guard !Task.isCancelled else { return }
+            self.lastRerouteAt = Date()
+            self.calculateRoute(to: item)
+        }
+    }
+
     private func applyRoute(_ newRoute: MKRoute) {
         route = newRoute
         currentStepIndex = firstNonEmptyStepIndex()
@@ -199,6 +224,9 @@ final class NavigationManager: NSObject, ObservableObject {
     private func clearRoute(keepDestination: Bool) {
         route = nil
         isCalculating = false
+        rerouteTask?.cancel()
+        rerouteTask = nil
+        lastRerouteAt = nil
 
         polylinePoints = []
         polylineCumDist = []
@@ -257,7 +285,7 @@ final class NavigationManager: NSObject, ObservableObject {
 
         // Reroute if off-route while navigating.
         if isNavigating, distanceToRoute >= rerouteThresholdMeters, let dest = destination {
-            calculateRoute(to: dest)
+            scheduleReroute(to: dest)
         }
     }
 
