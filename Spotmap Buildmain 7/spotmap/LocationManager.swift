@@ -204,7 +204,7 @@ final class FriendsStore: ObservableObject {
             }
             _ = try await db.save(record)
         } catch {
-            setLastError(error.localizedDescription)
+            setLastError(AppErrorMapper.message(for: error))
             disableIfEntitlementOrAccountIssue(error)
         }
     }
@@ -235,7 +235,7 @@ final class FriendsStore: ObservableObject {
             let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
             setFriends(sorted)
         } catch {
-            setLastError(error.localizedDescription)
+            setLastError(AppErrorMapper.message(for: error))
             disableIfEntitlementOrAccountIssue(error)
         }
     }
@@ -339,4 +339,3 @@ private extension CKContainer {
         }
     }
 }
-
