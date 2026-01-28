@@ -68,7 +68,10 @@ final class NavigationManager: NSObject, ObservableObject {
 
         // Start updates early so we have a "current location" when the user taps navigate.
         locationManager.requestWhenInUseAuthorization()
-        locationManager.startUpdatingLocation()
+        if locationManager.authorizationStatus == .authorizedAlways
+            || locationManager.authorizationStatus == .authorizedWhenInUse {
+            locationManager.startUpdatingLocation()
+        }
     }
 
     // MARK: - Public actions
@@ -426,7 +429,12 @@ final class NavigationManager: NSObject, ObservableObject {
 
 extension NavigationManager: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        // No-op: app can work without location but navigation will show no route.
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            manager.startUpdatingLocation()
+        default:
+            manager.stopUpdatingLocation()
+        }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
