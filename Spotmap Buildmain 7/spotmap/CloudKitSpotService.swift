@@ -192,7 +192,7 @@ final class CloudKitSpotService: SpotService {
         query.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
         // Reduce payload: only request what we need.
-        let desiredKeys = ["title", "note", "location", "createdAt"]
+        let desiredKeys = ["title", "note", "location", "createdAt", "photo"]
 
         guard limit > 0 else { return [] }
 
