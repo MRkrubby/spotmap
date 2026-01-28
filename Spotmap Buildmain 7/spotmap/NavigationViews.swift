@@ -201,9 +201,11 @@ final class PlaceSearchViewModel: NSObject, ObservableObject, MKLocalSearchCompl
     private func updateCompleter(query: String) async {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if q.isEmpty {
+            isSearching = false
             completions = []
             return
         }
+        isSearching = true
         completer.queryFragment = q
     }
 
@@ -233,12 +235,14 @@ final class PlaceSearchViewModel: NSObject, ObservableObject, MKLocalSearchCompl
         // Keep it snappy: show top 12 results.
         let res = Array(completer.results.prefix(12))
         Task { @MainActor in
+            self.isSearching = false
             self.completions = res
         }
     }
 
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         Task { @MainActor in
+            self.isSearching = false
             self.completions = []
         }
     }
