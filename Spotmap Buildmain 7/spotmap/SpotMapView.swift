@@ -166,34 +166,24 @@ struct SpotMapView: View {
     // MARK: - Deep links
     
     private func handleDeepLink(_ url: URL) {
-        guard url.scheme == "spotmap" else { return }
-        
-        // spotmap://spot/<id>
-        // spotmap://navigate/spot/<id>
-        // spotmap://journeys
-        // spotmap://journey/toggle
-        let parts = url.pathComponents
-        
-        guard parts.count >= 2 else { return }
-        
-        switch parts[1] {
-        case "spot":
+        guard let deepLink = DeepLink(url: url) else { return }
+
+        switch deepLink {
+        case .home:
+            break
+        case .spot:
             vm.handleDeepLink(url)
-            
-        case "navigate":
-            guard parts.count >= 4, parts[2] == "spot" else { return }
-            let recordName = parts[3]
-            
+        case .navigateSpot(let recordName):
             Task {
                 if let spot = await vm.repo.fetchSpotIfNeeded(recordName: recordName) {
                     let coord = spot.location.coordinate
                     let item = MKMapItem(placemark: MKPlacemark(coordinate: coord))
                     item.name = spot.title
-                    
+
                     await MainActor.run {
                         nav.previewNavigation(to: item, name: spot.title)
                     }
-                    
+
                     // Auto-start once the route is ready (CarPlay use-case)
                     for _ in 0..<30 {
                         try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
@@ -205,17 +195,10 @@ struct SpotMapView: View {
                     }
                 }
             }
-            
-        case "journeys":
+        case .journeys:
             showingJourneysSheet = true
-            
-        case "journey":
-            if parts.count >= 3, parts[2] == "toggle" {
-                journeys.toggle()
-            }
-            
-        default:
-            break
+        case .journeyToggle:
+            journeys.toggle()
         }
     }
     
