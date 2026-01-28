@@ -22,6 +22,7 @@ struct SpotMapView: View {
     @State private var publishDebouncer = Debouncer()
     
     @State private var selection: String? = nil
+    @State private var autoStartNavigationTask: Task<Void, Never>? = nil
 
     // Sheets
     @State private var showingSpotsList = false
@@ -155,6 +156,15 @@ struct SpotMapView: View {
                     FogOfWarStore.shared.reveal(location: loc, minMoveMeters: 0)
                 }
             }
+            .onDisappear {
+                cancelAutoStartNavigationTask()
+            }
+            .onChange(of: nav.isPreviewing) { _, _ in
+                cancelAutoStartNavigationTaskIfNavigationCleared()
+            }
+            .onChange(of: nav.isNavigating) { _, _ in
+                cancelAutoStartNavigationTaskIfNavigationCleared()
+            }
             .onChange(of: nav.recenterToken) { _, _ in
                 vm.focusOnUser()
             }
@@ -175,7 +185,8 @@ struct SpotMapView: View {
         case .spot:
             vm.handleDeepLink(url)
         case .navigateSpot(let recordName):
-            Task {
+            cancelAutoStartNavigationTask()
+            autoStartNavigationTask = Task {
                 if let spot = await vm.repo.fetchSpotIfNeeded(recordName: recordName) {
                     let coord = spot.location.coordinate
                     let item = MKMapItem(placemark: MKPlacemark(coordinate: coord))
@@ -189,6 +200,8 @@ struct SpotMapView: View {
                     for _ in 0..<30 {
                         try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
                         let ready = await MainActor.run { !nav.isCalculating && nav.route != nil }
+                        let stillPreviewing = await MainActor.run { nav.isPreviewing }
+                        guard stillPreviewing else { break }
                         if ready {
                             await MainActor.run { nav.startNavigation() }
                             break
@@ -200,6 +213,17 @@ struct SpotMapView: View {
             showingJourneysSheet = true
         case .journeyToggle:
             journeys.toggle()
+        }
+    }
+
+    private func cancelAutoStartNavigationTask() {
+        autoStartNavigationTask?.cancel()
+        autoStartNavigationTask = nil
+    }
+
+    private func cancelAutoStartNavigationTaskIfNavigationCleared() {
+        if !nav.isPreviewing && !nav.isNavigating {
+            cancelAutoStartNavigationTask()
         }
     }
     
