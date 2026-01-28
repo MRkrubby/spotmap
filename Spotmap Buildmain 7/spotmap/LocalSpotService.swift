@@ -77,8 +77,8 @@ final class LocalSpotService: SpotService {
     }
 
     private func removeOrphanedPhotos(previous: [CacheSpot], current: [CacheSpot]) {
-        let currentFiles = Set(current.compactMap(\.photoFilename))
-        let previousFiles = Set(previous.compactMap(\.photoFilename))
+        let currentFiles = Set(current.compactMap(\.photoIdentifier))
+        let previousFiles = Set(previous.compactMap(\.photoIdentifier))
         let orphaned = previousFiles.subtracting(currentFiles)
         orphaned.forEach { photoStore.deletePhoto(filename: $0) }
     }
@@ -90,7 +90,7 @@ final class LocalSpotService: SpotService {
         let lat: Double
         let lon: Double
         let createdAt: Date
-        let photoFilename: String?
+        let photoIdentifier: String?
 
         init(_ spot: Spot, photoStore: SpotPhotoStore) {
             recordName = spot.id.recordName
@@ -100,26 +100,64 @@ final class LocalSpotService: SpotService {
             lon = spot.longitude
             createdAt = spot.createdAt
             if let photoData = spot.photoData {
-                let filename = photoStore.filename(for: recordName)
+                let filename = photoStore.uniqueFilename(for: recordName)
                 photoStore.savePhotoData(photoData, filename: filename)
-                photoFilename = filename
+                photoIdentifier = filename
+            } else if let photoAssetURL = spot.photoAssetURL {
+                photoIdentifier = photoAssetURL.lastPathComponent
             } else {
-                photoFilename = nil
+                photoIdentifier = nil
             }
         }
 
         func toSpot(photoStore: SpotPhotoStore) -> Spot {
-            var spot = Spot(
+            let assetURL = photoIdentifier.map { photoStore.url(for: $0) }
+            let spot = Spot(
                 id: CKRecord.ID(recordName: recordName),
                 title: title,
                 note: note,
                 location: CLLocation(latitude: lat, longitude: lon),
-                createdAt: createdAt
+                createdAt: createdAt,
+                photoAssetURL: assetURL
             )
-            if let photoFilename {
-                spot.photoData = photoStore.loadPhotoData(filename: photoFilename)
-            }
             return spot
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            recordName = try container.decode(String.self, forKey: .recordName)
+            title = try container.decode(String.self, forKey: .title)
+            note = try container.decode(String.self, forKey: .note)
+            lat = try container.decode(Double.self, forKey: .lat)
+            lon = try container.decode(Double.self, forKey: .lon)
+            createdAt = try container.decode(Date.self, forKey: .createdAt)
+            if let identifier = try container.decodeIfPresent(String.self, forKey: .photoIdentifier) {
+                photoIdentifier = identifier
+            } else {
+                photoIdentifier = try container.decodeIfPresent(String.self, forKey: .photoFilename)
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(recordName, forKey: .recordName)
+            try container.encode(title, forKey: .title)
+            try container.encode(note, forKey: .note)
+            try container.encode(lat, forKey: .lat)
+            try container.encode(lon, forKey: .lon)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(photoIdentifier, forKey: .photoIdentifier)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case recordName
+            case title
+            case note
+            case lat
+            case lon
+            case createdAt
+            case photoIdentifier
+            case photoFilename
         }
     }
 }
