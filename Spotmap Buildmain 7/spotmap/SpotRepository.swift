@@ -122,6 +122,8 @@ final class SpotRepository: ObservableObject {
             cache.save(fetched)
         } catch is CancellationError {
             // Expected when the user pans/zooms quickly.
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
         } catch {
             lastErrorMessage = humanReadable(error: error)
         }
@@ -148,6 +150,10 @@ final class SpotRepository: ObservableObject {
             }
             spots.insert(saved, at: 0)
             cache.save(spots)
+        } catch is CancellationError {
+            // Ignore cancellations from fast user interactions.
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
         } catch {
             lastErrorMessage = humanReadable(error: error)
         }
@@ -170,6 +176,12 @@ final class SpotRepository: ObservableObject {
             spots.insert(spot, at: 0)
             cache.save(spots)
             return spot
+        } catch is CancellationError {
+            // Ignore cancellations from fast user interactions.
+            return nil
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
+            return nil
         } catch {
             lastErrorMessage = humanReadable(error: error)
             return nil
@@ -187,6 +199,10 @@ final class SpotRepository: ObservableObject {
             }
             spots.removeAll { $0.id.recordName == spot.id.recordName }
             cache.save(spots)
+        } catch is CancellationError {
+            // Ignore cancellations from fast user interactions.
+        } catch let error as TimeoutError {
+            lastErrorMessage = error.localizedDescription
         } catch {
             lastErrorMessage = humanReadable(error: error)
         }
@@ -314,4 +330,3 @@ extension SpotRepository {
         return mgr.location
     }
 }
-
