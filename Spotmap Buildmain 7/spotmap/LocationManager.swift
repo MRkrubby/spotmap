@@ -225,13 +225,9 @@ final class FriendsStore: ObservableObject {
                 return
             }
 
-            var loaded: [FriendProfile] = []
-            for code in codes {
-                let rid = CKRecord.ID(recordName: "friend-\(code)")
-                if let record = try? await db.record(for: rid) {
-                    loaded.append(Self.decode(record))
-                }
-            }
+            let recordIDs = codes.map { CKRecord.ID(recordName: "friend-\($0)") }
+            let records = try await fetchFriendRecords(from: db, recordIDs: recordIDs)
+            let loaded = records.map { Self.decode($0) }
             let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
             setFriends(sorted)
         } catch {
@@ -290,6 +286,32 @@ final class FriendsStore: ObservableObject {
         }
     }
 
+    private func fetchFriendRecords(from db: CKDatabase, recordIDs: [CKRecord.ID]) async throws -> [CKRecord] {
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = CKFetchRecordsOperation(recordIDs: recordIDs)
+            let lock = NSLock()
+            var records: [CKRecord] = []
+
+            operation.perRecordResultBlock = { _, result in
+                guard case .success(let record) = result else { return }
+                lock.lock()
+                records.append(record)
+                lock.unlock()
+            }
+
+            operation.fetchRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: records)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            db.add(operation)
+        }
+    }
+
     @MainActor
     private func disableIfEntitlementOrAccountIssue(_ error: Error) {
         // If CloudKit isn't configured or the user isn't signed in, keep the app stable
@@ -339,4 +361,3 @@ private extension CKContainer {
         }
     }
 }
-
