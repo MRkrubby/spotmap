@@ -4,7 +4,7 @@ import Combine
 
 /// Stores and records journeys (trip logging).
 ///
-/// This is intentionally **local-first** (UserDefaults) so it works out of the box.
+/// This is intentionally **local-first** (file-backed JSON) so it works out of the box.
 /// Cloud sync can be layered on later, but this keeps the core UX fast and reliable.
 @MainActor
 final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDelegate {
@@ -63,7 +63,11 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
 
     override init() {
         super.init()
-        journeys = store.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let cached = await store.load()
+            self.journeys = cached
+        }
 
         // CLLocationManager delegate callbacks are delivered on the main run loop by default
         // when created on the main thread (which is the case in SwiftUI apps).
@@ -191,8 +195,11 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
     }
 
     func delete(_ record: JourneyRecord) {
-        store.delete(record)
-        journeys = store.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let updated = await store.delete(record)
+            self.journeys = updated
+        }
     }
 
     func currentPolyline() -> [CLLocationCoordinate2D] {
@@ -356,8 +363,11 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
             avgSpeedMps: avg
         )
 
-        store.add(record)
-        journeys = store.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let updated = await store.add(record)
+            self.journeys = updated
+        }
         ExploreStore.shared.ingest(record)
 
         // Reset segment-only UI metrics
@@ -390,29 +400,72 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
 
 // MARK: - Storage
 
-private struct JourneyStore {
-    private let key = "Journeys.v1"
+private final class JourneyStore {
+    private let queue = DispatchQueue(label: "spotmap.journey-store", qos: .utility)
+    private let fileURL: URL
 
-    func load() -> [JourneyRecord] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+    init() {
+        self.fileURL = Self.storeURL()
+    }
+
+    func load() async -> [JourneyRecord] {
+        await withCheckedContinuation { continuation in
+            queue.async { [fileURL] in
+                let records = Self.loadRecords(from: fileURL)
+                continuation.resume(returning: records)
+            }
+        }
+    }
+
+    func add(_ record: JourneyRecord) async -> [JourneyRecord] {
+        await mutate { all in
+            var updated = all
+            updated.insert(record, at: 0)
+            return updated
+        }
+    }
+
+    func delete(_ record: JourneyRecord) async -> [JourneyRecord] {
+        await mutate { all in
+            all.filter { $0.id != record.id }
+        }
+    }
+
+    private func mutate(_ transform: @escaping ([JourneyRecord]) -> [JourneyRecord]) async -> [JourneyRecord] {
+        await withCheckedContinuation { continuation in
+            queue.async { [fileURL] in
+                let existing = Self.loadRecords(from: fileURL)
+                let updated = transform(existing)
+                Self.persist(updated, to: fileURL)
+                continuation.resume(returning: updated)
+            }
+        }
+    }
+
+    private static func loadRecords(from fileURL: URL) -> [JourneyRecord] {
+        guard let data = try? Data(contentsOf: fileURL) else { return [] }
         return (try? JSONDecoder().decode([JourneyRecord].self, from: data)) ?? []
     }
 
-    func add(_ record: JourneyRecord) {
-        var all = load()
-        all.insert(record, at: 0)
-        persist(all)
-    }
-
-    func delete(_ record: JourneyRecord) {
-        var all = load()
-        all.removeAll { $0.id == record.id }
-        persist(all)
-    }
-
-    private func persist(_ all: [JourneyRecord]) {
+    private static func persist(_ all: [JourneyRecord], to fileURL: URL) {
         guard let data = try? JSONEncoder().encode(all) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        do {
+            try ensureDirectoryExists(for: fileURL)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            return
+        }
+    }
+
+    private static func storeURL() -> URL {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Spotmap", isDirectory: true)
+        return directory.appendingPathComponent("Journeys.v1.json")
+    }
+
+    private static func ensureDirectoryExists(for fileURL: URL) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 }
 
@@ -560,4 +613,3 @@ final class ExploreStore: ObservableObject {
         UserDefaults.standard.set(data, forKey: key)
     }
 }
-
