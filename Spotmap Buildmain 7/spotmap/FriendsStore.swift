@@ -2,6 +2,11 @@ import Foundation
 import Combine
 import CoreLocation
 import CloudKit
+#if canImport(Security)
+import Security
+import CoreFoundation
+import Darwin
+#endif
 
 // MARK: - Friends (Life360-style, CloudKit prototype)
 
@@ -25,6 +30,17 @@ struct FriendProfile: Identifiable, Hashable, Codable {
 /// Named `FriendsStore` (instead of `FriendsRepository`) to avoid symbol clashes
 /// if a project or dependency also defines a `FriendsRepository` type.
 final class FriendsStore: ObservableObject {
+    enum FriendsStoreError: LocalizedError {
+        case cloudKitNotAvailable(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .cloudKitNotAvailable(let message):
+                return message
+            }
+        }
+    }
+
     @Published private(set) var me: FriendProfile
     @Published private(set) var friends: [FriendProfile] = []
     @Published var isEnabled: Bool = true
@@ -32,6 +48,8 @@ final class FriendsStore: ObservableObject {
 
     private let meKey = "Friends.me.v1"
     private let followingKey = "Friends.following.v1"
+    private let lastJourneyDirectoryName = "Friends"
+    private var lastSavedJourneyZlib: Data? = nil
     private var refreshTask: Task<Void, Never>? = nil
 
     // Lazily created. This avoids touching CloudKit at app launch on setups
@@ -49,6 +67,7 @@ final class FriendsStore: ObservableObject {
             self.me = FriendProfile(code: code, displayName: "Ik", lastLat: nil, lastLon: nil, updatedAt: nil, lastJourneyZlib: nil)
             persistMe()
         }
+        loadLastJourneyZlib()
         loadFollowing()
     }
 
@@ -88,8 +107,10 @@ final class FriendsStore: ObservableObject {
         // Store compressed points so friends can render your last route
         let raw = (try? JSONEncoder().encode(journey.decodedPoints())) ?? Data()
         let zipped = (try? JourneyCompression.compress(raw)) ?? raw
+        guard me.lastJourneyZlib != zipped else { return }
         me.lastJourneyZlib = zipped
         me.updatedAt = Date()
+        persistLastJourneyZlib()
         persistMe()
     }
 
@@ -155,14 +176,27 @@ final class FriendsStore: ObservableObject {
                 return
             }
 
-            var loaded: [FriendProfile] = []
-            for code in codes {
-                let rid = CKRecord.ID(recordName: "friend-\(code)")
-                if let record = try? await db.record(for: rid) {
-                    loaded.append(Self.decode(record))
+            let recordIDs = codes.map { CKRecord.ID(recordName: "friend-\($0)") }
+            let existingByCode = Dictionary(uniqueKeysWithValues: friends.map { ($0.code.uppercased(), $0) })
+            let fetchResult = try await fetchFriendRecords(recordIDs, from: db)
+            var loadedByCode: [String: FriendProfile] = [:]
+            for record in fetchResult.records.values {
+                let profile = Self.decode(record)
+                loadedByCode[profile.code.uppercased()] = profile
+            }
+            if !fetchResult.failures.isEmpty {
+                setLastError("Some friends could not be refreshed.")
+            }
+
+            var merged: [FriendProfile] = []
+            for code in codes.map({ $0.uppercased() }) {
+                if let updated = loadedByCode[code] {
+                    merged.append(updated)
+                } else if let existing = existingByCode[code] {
+                    merged.append(existing)
                 }
             }
-            let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
+            let sorted = merged.sorted(by: { $0.displayName < $1.displayName })
             setFriends(sorted)
         } catch {
             setLastError(error.localizedDescription)
@@ -189,9 +223,39 @@ final class FriendsStore: ObservableObject {
     }
 
     private func persistMe() {
-        if let data = try? JSONEncoder().encode(me) {
+        var snapshot = me
+        snapshot.lastJourneyZlib = nil
+        if let data = try? JSONEncoder().encode(snapshot) {
             UserDefaults.standard.set(data, forKey: meKey)
         }
+    }
+
+    private func loadLastJourneyZlib() {
+        guard let url = lastJourneyURL(for: me.code) else { return }
+        guard let data = try? Data(contentsOf: url) else { return }
+        me.lastJourneyZlib = data
+        lastSavedJourneyZlib = data
+    }
+
+    private func persistLastJourneyZlib() {
+        guard let url = lastJourneyURL(for: me.code) else { return }
+        guard let data = me.lastJourneyZlib else { return }
+        guard data != lastSavedJourneyZlib else { return }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
+            try data.write(to: url, options: [.atomic])
+            lastSavedJourneyZlib = data
+        } catch {
+            // Ignore persistence failures; keep in-memory copy.
+        }
+    }
+
+    private func lastJourneyURL(for code: String) -> URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let directory = base.appendingPathComponent(lastJourneyDirectoryName, isDirectory: true)
+        return directory.appendingPathComponent("last-journey-\(code).zlib")
     }
 
     @MainActor
@@ -205,25 +269,35 @@ final class FriendsStore: ObservableObject {
     }
 
     private func ensureCloudKitAvailable() async throws {
+        // 1) Entitlement check (fast, local)
+        guard Self.hasCloudKitEntitlement() else {
+            throw FriendsStoreError.cloudKitNotAvailable(
+                "CloudKit entitlement ontbreekt. Zet iCloud → CloudKit aan in Signing & Capabilities."
+            )
+        }
+
         // Create container lazily. If the capability isn't configured, calls below
         // will throw, but we won't crash at app launch.
         if container == nil {
             container = CKContainer.default()
         }
         guard let container else {
-            throw NSError(domain: "FriendsStore", code: -11, userInfo: [NSLocalizedDescriptionKey: "CloudKit container unavailable"])
+            throw FriendsStoreError.cloudKitNotAvailable("CloudKit container unavailable.")
         }
 
         let status = try await container.accountStatus()
-        guard status == .available else {
-            throw NSError(domain: "FriendsStore", code: -12, userInfo: [NSLocalizedDescriptionKey: "iCloud is not available (status: \(status.rawValue))"])
-        }
+        try ensureAccountStatusOK(status)
     }
 
     @MainActor
     private func disableIfEntitlementOrAccountIssue(_ error: Error) {
         // If CloudKit isn't configured or the user isn't signed in, keep the app stable
         // by disabling the feature and stopping background refresh.
+        if error is FriendsStoreError {
+            isEnabled = false
+            stopAutoRefresh()
+            return
+        }
         if let ck = error as? CKError {
             switch ck.code {
             case .notAuthenticated, .permissionFailure:
@@ -232,6 +306,43 @@ final class FriendsStore: ObservableObject {
             default:
                 break
             }
+        }
+    }
+
+    private func fetchFriendRecords(
+        _ recordIDs: [CKRecord.ID],
+        from database: CKDatabase
+    ) async throws -> (records: [CKRecord.ID: CKRecord], failures: [CKRecord.ID: Error]) {
+        try await withCheckedThrowingContinuation { continuation in
+            var recordsByID: [CKRecord.ID: CKRecord] = [:]
+            var failures: [CKRecord.ID: Error] = [:]
+            let operation = CKFetchRecordsOperation(recordIDs: recordIDs)
+            operation.perRecordResultBlock = { recordID, result in
+                switch result {
+                case .success(let record):
+                    recordsByID[recordID] = record
+                case .failure(let error):
+                    failures[recordID] = error
+                }
+            }
+            operation.fetchRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: (recordsByID, failures))
+                case .failure(let error):
+                    if let ckError = error as? CKError, ckError.code == .partialFailure {
+                        if let partialErrors = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [CKRecord.ID: Error] {
+                            for (recordID, partialError) in partialErrors {
+                                failures[recordID] = partialError
+                            }
+                        }
+                        continuation.resume(returning: (recordsByID, failures))
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            database.add(operation)
         }
     }
 
@@ -244,5 +355,68 @@ final class FriendsStore: ObservableObject {
         return FriendProfile(code: code, displayName: name,
                              lastLat: loc?.coordinate.latitude, lastLon: loc?.coordinate.longitude,
                              updatedAt: updatedAt, lastJourneyZlib: data)
+    }
+
+    private static func hasCloudKitEntitlement() -> Bool {
+#if canImport(Security)
+        // Dynamically look up SecTask symbols to avoid compile-time dependency on platforms where they're unavailable.
+        // If unavailable at runtime, return false and let account status gating handle UX.
+        typealias SecTaskRef = CFTypeRef
+        typealias SecTaskCreateFromSelfFn = @convention(c) (CFAllocator?) -> SecTaskRef?
+        typealias SecTaskCopyValueForEntitlementFn = @convention(c) (SecTaskRef, CFString, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> CFTypeRef?
+
+        // Resolve symbols using dlsym to prevent hard references on unsupported platforms.
+        guard let handle = dlopen(nil, RTLD_NOW) else { return false }
+        defer { dlclose(handle) }
+
+        guard let createSym = dlsym(handle, "SecTaskCreateFromSelf"),
+              let copySym = dlsym(handle, "SecTaskCopyValueForEntitlement") else {
+            return false
+        }
+        let SecTaskCreateFromSelf = unsafeBitCast(createSym, to: SecTaskCreateFromSelfFn.self)
+        let SecTaskCopyValueForEntitlement = unsafeBitCast(copySym, to: SecTaskCopyValueForEntitlementFn.self)
+
+        guard let task = SecTaskCreateFromSelf(kCFAllocatorDefault) else { return false }
+        let key: CFString = "com.apple.developer.icloud-services" as CFString
+        let value: CFTypeRef? = SecTaskCopyValueForEntitlement(task, key, nil)
+        guard let value else { return false }
+
+        // Handle both array and string representations defensively.
+        if CFGetTypeID(value) == CFArrayGetTypeID(),
+           let arr = value as? [Any] {
+            return arr.contains { item in
+                guard let s = item as? String else { return false }
+                return s == "CloudKit" || s == "CloudKit-Anonymous"
+            }
+        }
+
+        if let s = value as? String {
+            return s == "CloudKit" || s == "CloudKit-Anonymous"
+        }
+
+        return false
+#else
+        // If Security framework isn't available (e.g., certain platforms),
+        // fall back to assuming CloudKit entitlement might be present. The
+        // subsequent CloudKit account status check will still gate usage.
+        return true
+#endif
+    }
+
+    private func ensureAccountStatusOK(_ status: CKAccountStatus) throws {
+        switch status {
+        case .available:
+            return
+        case .noAccount:
+            throw FriendsStoreError.cloudKitNotAvailable("Geen iCloud account ingelogd op dit apparaat.")
+        case .restricted:
+            throw FriendsStoreError.cloudKitNotAvailable("iCloud is restricted op dit apparaat.")
+        case .temporarilyUnavailable:
+            throw FriendsStoreError.cloudKitNotAvailable("iCloud is tijdelijk niet beschikbaar.")
+        case .couldNotDetermine:
+            throw FriendsStoreError.cloudKitNotAvailable("Kon iCloud status niet bepalen. Check iCloud/CloudKit instellingen.")
+        @unknown default:
+            throw FriendsStoreError.cloudKitNotAvailable("Onbekende iCloud status. Check iCloud/CloudKit instellingen.")
+        }
     }
 }

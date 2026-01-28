@@ -11,13 +11,14 @@ struct SpotDetailView: View {
     @EnvironmentObject private var nav: NavigationManager
     @Environment(\.dismiss) private var dismiss
     @State private var confirmDelete = false
+    @State private var loadedPhotoData: Data?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
 
-if let data = spot.photoData, let ui = UIImage(data: data) {
+if let data = spot.photoData ?? loadedPhotoData, let ui = UIImage(data: data) {
     Image(uiImage: ui)
         .resizable()
         .scaledToFill()
@@ -109,6 +110,9 @@ if let data = spot.photoData, let ui = UIImage(data: data) {
                 Text("Dit kan niet ongedaan gemaakt worden.")
             }
         }
+        .task {
+            await loadPhotoIfNeeded()
+        }
     }
 
     private var deepLinkURL: URL {
@@ -134,5 +138,9 @@ if let data = spot.photoData, let ui = UIImage(data: data) {
         // Avoid stacked sheets: close the detail sheet first, then show route preview.
         dismiss()
     }
-}
 
+    private func loadPhotoIfNeeded() async {
+        guard loadedPhotoData == nil, spot.photoData == nil else { return }
+        loadedPhotoData = await spot.loadPhotoData()
+    }
+}

@@ -8,6 +8,7 @@ import CoreLocation
 /// when CloudKit is unavailable.
 final class LocalSpotService: SpotService {
     private let key = "LocalSpots.v1"
+    private let photoStore = SpotPhotoStore.shared
 
     static func makeRecordNameIfNeeded(forBackend backend: SpotRepository.Backend) -> String {
         switch backend {
@@ -59,14 +60,27 @@ final class LocalSpotService: SpotService {
     // MARK: - Storage
 
     @MainActor private func load() -> [Spot] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([CacheSpot].self, from: data))?.map { $0.toSpot() } ?? []
+        loadCacheSpots().map { $0.toSpot(photoStore: photoStore) }
     }
 
     @MainActor private func persist(_ spots: [Spot]) {
-        let enc = spots.map(CacheSpot.init)
+        let previous = loadCacheSpots()
+        let enc = spots.map { CacheSpot($0, photoStore: photoStore) }
         guard let data = try? JSONEncoder().encode(enc) else { return }
         UserDefaults.standard.set(data, forKey: key)
+        removeOrphanedPhotos(previous: previous, current: enc)
+    }
+
+    @MainActor private func loadCacheSpots() -> [CacheSpot] {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([CacheSpot].self, from: data)) ?? []
+    }
+
+    private func removeOrphanedPhotos(previous: [CacheSpot], current: [CacheSpot]) {
+        let currentFiles = Set(current.compactMap(\.photoIdentifier))
+        let previousFiles = Set(previous.compactMap(\.photoIdentifier))
+        let orphaned = previousFiles.subtracting(currentFiles)
+        orphaned.forEach { photoStore.deletePhoto(filename: $0) }
     }
 
     private struct CacheSpot: Codable {
@@ -76,28 +90,74 @@ final class LocalSpotService: SpotService {
         let lat: Double
         let lon: Double
         let createdAt: Date
-        let photoData: Data?
+        let photoIdentifier: String?
 
-        init(_ spot: Spot) {
+        init(_ spot: Spot, photoStore: SpotPhotoStore) {
             recordName = spot.id.recordName
             title = spot.title
             note = spot.note
             lat = spot.latitude
             lon = spot.longitude
             createdAt = spot.createdAt
-            photoData = spot.photoData
+            if let photoData = spot.photoData {
+                let filename = photoStore.uniqueFilename(for: recordName)
+                photoStore.savePhotoData(photoData, filename: filename)
+                photoIdentifier = filename
+            } else if let photoAssetURL = spot.photoAssetURL {
+                photoIdentifier = photoAssetURL.lastPathComponent
+            } else {
+                photoIdentifier = nil
+            }
         }
 
-        func toSpot() -> Spot {
-            var spot = Spot(
+        func toSpot(photoStore: SpotPhotoStore) -> Spot {
+            let assetURL = photoIdentifier.map { photoStore.url(for: $0) }
+            let spot = Spot(
                 id: CKRecord.ID(recordName: recordName),
                 title: title,
                 note: note,
                 location: CLLocation(latitude: lat, longitude: lon),
-                createdAt: createdAt
+                createdAt: createdAt,
+                photoAssetURL: assetURL
             )
-            spot.photoData = photoData
             return spot
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            recordName = try container.decode(String.self, forKey: .recordName)
+            title = try container.decode(String.self, forKey: .title)
+            note = try container.decode(String.self, forKey: .note)
+            lat = try container.decode(Double.self, forKey: .lat)
+            lon = try container.decode(Double.self, forKey: .lon)
+            createdAt = try container.decode(Date.self, forKey: .createdAt)
+            if let identifier = try container.decodeIfPresent(String.self, forKey: .photoIdentifier) {
+                photoIdentifier = identifier
+            } else {
+                photoIdentifier = try container.decodeIfPresent(String.self, forKey: .photoFilename)
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(recordName, forKey: .recordName)
+            try container.encode(title, forKey: .title)
+            try container.encode(note, forKey: .note)
+            try container.encode(lat, forKey: .lat)
+            try container.encode(lon, forKey: .lon)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(photoIdentifier, forKey: .photoIdentifier)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case recordName
+            case title
+            case note
+            case lat
+            case lon
+            case createdAt
+            case photoIdentifier
+            case photoFilename
         }
     }
 }

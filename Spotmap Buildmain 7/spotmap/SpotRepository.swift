@@ -45,7 +45,13 @@ final class SpotRepository: ObservableObject {
         self.backend = backend
         self.cache = SpotCache(key: "SpotCache.v1.\(backend.rawValue)")
         self.service = SpotRepository.makeService(for: backend)
-        self.spots = cache.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let cached = await cache.load()
+            await MainActor.run {
+                self.spots = cached
+            }
+        }
     }
 
     // MARK: - Backend switching
@@ -61,7 +67,13 @@ final class SpotRepository: ObservableObject {
 
         // Switch cache namespace so we don't mix local vs cloud snapshots.
         self.cache.setKey("SpotCache.v1.\(backend.rawValue)")
-        self.spots = cache.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let cached = await cache.load()
+            await MainActor.run {
+                self.spots = cached
+            }
+        }
 
         refreshNearby(center: currentCenter, force: true)
     }
@@ -233,27 +245,73 @@ private extension SpotRepository {
 
 // MARK: - Cache
 
-@MainActor
 private final class SpotCache {
     private var key: String
+    private let photoStore = SpotPhotoStore.shared
+    private let queue = DispatchQueue(label: "spotmap.spot-cache", qos: .utility)
+    private var fileURL: URL
 
     init(key: String) {
         self.key = key
+        self.fileURL = Self.cacheURL(for: key)
     }
 
     func setKey(_ newKey: String) {
         self.key = newKey
+        self.fileURL = Self.cacheURL(for: newKey)
     }
 
-    func load() -> [Spot] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([CacheSpot].self, from: data))?.map { $0.toSpot() } ?? []
+    func load() async -> [Spot] {
+        await withCheckedContinuation { continuation in
+            queue.async { [fileURL, photoStore] in
+                let cacheSpots = Self.loadCacheSpots(from: fileURL)
+                let spots = cacheSpots.map { $0.toSpot(photoStore: photoStore) }
+                continuation.resume(returning: spots)
+            }
+        }
     }
 
     func save(_ spots: [Spot]) {
-        let cache = spots.map(CacheSpot.init)
-        guard let data = try? JSONEncoder().encode(cache) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        queue.async { [fileURL, photoStore] in
+            let previous = Self.loadCacheSpots(from: fileURL)
+            let cache = spots.map { CacheSpot($0, photoStore: photoStore) }
+            guard let data = try? JSONEncoder().encode(cache) else { return }
+            do {
+                try Self.ensureDirectoryExists(for: fileURL)
+                try data.write(to: fileURL, options: .atomic)
+            } catch {
+                return
+            }
+            Self.removeOrphanedPhotos(previous: previous, current: cache, photoStore: photoStore)
+        }
+    }
+
+    private static func loadCacheSpots(from fileURL: URL) -> [CacheSpot] {
+        guard let data = try? Data(contentsOf: fileURL) else { return [] }
+        return (try? JSONDecoder().decode([CacheSpot].self, from: data)) ?? []
+    }
+
+    private static func removeOrphanedPhotos(
+        previous: [CacheSpot],
+        current: [CacheSpot],
+        photoStore: SpotPhotoStore
+    ) {
+        let currentFiles = Set(current.compactMap(\.photoFilename))
+        let previousFiles = Set(previous.compactMap(\.photoFilename))
+        let orphaned = previousFiles.subtracting(currentFiles)
+        orphaned.forEach { photoStore.deletePhoto(filename: $0) }
+    }
+
+    private static func cacheURL(for key: String) -> URL {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Spotmap", isDirectory: true)
+        let sanitizedKey = key.replacingOccurrences(of: "/", with: "_")
+        return directory.appendingPathComponent("\(sanitizedKey).json")
+    }
+
+    private static func ensureDirectoryExists(for fileURL: URL) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
     private struct CacheSpot: Codable {
@@ -263,24 +321,36 @@ private final class SpotCache {
         let lat: Double
         let lon: Double
         let createdAt: Date
+        let photoFilename: String?
 
-        init(_ spot: Spot) {
+        init(_ spot: Spot, photoStore: SpotPhotoStore) {
             self.recordName = spot.id.recordName
             self.title = spot.title
             self.note = spot.note
             self.lat = spot.latitude
             self.lon = spot.longitude
             self.createdAt = spot.createdAt
+            if let photoData = spot.photoData {
+                let filename = photoStore.filename(for: recordName)
+                photoStore.savePhotoData(photoData, filename: filename)
+                photoFilename = filename
+            } else {
+                photoFilename = nil
+            }
         }
 
-        func toSpot() -> Spot {
-            Spot(
+        func toSpot(photoStore: SpotPhotoStore) -> Spot {
+            var spot = Spot(
                 id: CKRecord.ID(recordName: recordName),
                 title: title,
                 note: note,
                 location: CLLocation(latitude: lat, longitude: lon),
                 createdAt: createdAt
             )
+            if let photoFilename {
+                spot.photoData = photoStore.loadPhotoData(filename: photoFilename)
+            }
+            return spot
         }
     }
 }

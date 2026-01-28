@@ -9,6 +9,7 @@ public struct Spot: Identifiable, Equatable, Hashable {
     public var location: CLLocation
     public var createdAt: Date
     public var photoData: Data?
+    public let photoAssetURL: URL?
 
     public var latitude: Double { location.coordinate.latitude }
     public var longitude: Double { location.coordinate.longitude }
@@ -20,13 +21,16 @@ public struct Spot: Identifiable, Equatable, Hashable {
                 title: String,
                 note: String,
                 location: CLLocation,
-                createdAt: Date = Date()) {
+                createdAt: Date = Date(),
+                photoData: Data? = nil,
+                photoAssetURL: URL? = nil) {
         self.id = id
         self.title = title
         self.note = note
         self.location = location
         self.createdAt = createdAt
-        self.photoData = nil
+        self.photoData = photoData
+        self.photoAssetURL = photoAssetURL
     }
 
     public init?(record: CKRecord) {
@@ -43,11 +47,18 @@ public struct Spot: Identifiable, Equatable, Hashable {
         self.location = location
         self.createdAt = createdAt
         let asset = record["photo"] as? CKAsset
-        var loadedPhoto: Data? = nil
-        if let url = asset?.fileURL {
-            loadedPhoto = try? Data(contentsOf: url)
+        self.photoData = nil
+        self.photoAssetURL = asset?.fileURL
+    }
+
+    public func loadPhotoData() async -> Data? {
+        if let photoData {
+            return photoData
         }
-        self.photoData = loadedPhoto
+        guard let url = photoAssetURL else { return nil }
+        return await Task.detached(priority: .utility) {
+            try? Data(contentsOf: url)
+        }.value
     }
 
     public func toRecord(existing: CKRecord? = nil) -> CKRecord {
@@ -62,7 +73,7 @@ public struct Spot: Identifiable, Equatable, Hashable {
         record["createdAt"] = createdAt as CKRecordValue
 
         if let photoData {
-            let tempFilename = "spot-photo-\(id.recordName)-\(UUID().uuidString).jpg"
+            let tempFilename = "spot-photo-\(UUID().uuidString).jpg"
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(tempFilename)
             do {
                 try photoData.write(to: url, options: [.atomic])

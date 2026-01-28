@@ -4,7 +4,7 @@ import Combine
 
 /// Stores and records journeys (trip logging).
 ///
-/// This is intentionally **local-first** (UserDefaults) so it works out of the box.
+/// This is intentionally **local-first** (file-backed JSON) so it works out of the box.
 /// Cloud sync can be layered on later, but this keeps the core UX fast and reliable.
 @MainActor
 final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDelegate {
@@ -55,6 +55,8 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
     private let minDistanceBetweenPoints: CLLocationDistance = 7
     private let minTimeBetweenPoints: TimeInterval = 2
     private let maxAcceptableAccuracy: CLLocationAccuracy = 65
+    private let maxSessionPoints: Int = 3000
+    private let sessionPointTimeWindow: TimeInterval = 6 * 60 * 60
 
     // Auto segmentation
     private let stationarySpeedThresholdMps: Double = 1.0       // ~3.6 km/h
@@ -63,7 +65,11 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
 
     override init() {
         super.init()
-        journeys = store.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let cached = await store.load()
+            self.journeys = cached
+        }
 
         // CLLocationManager delegate callbacks are delivered on the main run loop by default
         // when created on the main thread (which is the case in SwiftUI apps).
@@ -191,8 +197,11 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
     }
 
     func delete(_ record: JourneyRecord) {
-        store.delete(record)
-        journeys = store.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let updated = await store.delete(record)
+            self.journeys = updated
+        }
     }
 
     func currentPolyline() -> [CLLocationCoordinate2D] {
@@ -268,6 +277,7 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         // Add to session points (always)
         sessionPoints.append(JourneyPoint(lat: loc.coordinate.latitude, lon: loc.coordinate.longitude, ts: loc.timestamp, speedMps: currentSpeedMps))
         sessionLastAcceptedLocation = loc
+        pruneSessionPoints(now: loc.timestamp)
 
         // Optional: Reveal fog-of-war even when the screen is off (based on Explore toggle).
         if UserDefaults.standard.bool(forKey: exploreEnabledKey) {
@@ -356,8 +366,11 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
             avgSpeedMps: avg
         )
 
-        store.add(record)
-        journeys = store.load()
+        Task { [weak self] in
+            guard let self else { return }
+            let updated = await store.add(record)
+            self.journeys = updated
+        }
         ExploreStore.shared.ingest(record)
 
         // Reset segment-only UI metrics
@@ -386,33 +399,106 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         guard t > 0 else { return 0 }
         return distanceMeters / t
     }
+
+    private func pruneSessionPoints(now: Date) {
+        if sessionPointTimeWindow > 0 {
+            let cutoff = now.addingTimeInterval(-sessionPointTimeWindow)
+            if let firstIndex = sessionPoints.firstIndex(where: { $0.ts >= cutoff }) {
+                if firstIndex > 0 {
+                    sessionPoints.removeFirst(firstIndex)
+                }
+            } else {
+                sessionPoints.removeAll(keepingCapacity: true)
+            }
+        }
+
+        guard sessionPoints.count > maxSessionPoints else { return }
+        let strideSize = Int(ceil(Double(sessionPoints.count) / Double(maxSessionPoints)))
+        guard strideSize > 1 else {
+            sessionPoints = Array(sessionPoints.suffix(maxSessionPoints))
+            return
+        }
+
+        var downsampled: [JourneyPoint] = []
+        downsampled.reserveCapacity(maxSessionPoints)
+        for index in stride(from: 0, to: sessionPoints.count, by: strideSize) {
+            downsampled.append(sessionPoints[index])
+        }
+        if let last = sessionPoints.last, downsampled.last?.ts != last.ts {
+            downsampled.append(last)
+        }
+        sessionPoints = downsampled
+    }
 }
 
 // MARK: - Storage
 
-private struct JourneyStore {
-    private let key = "Journeys.v1"
+private final class JourneyStore {
+    private let queue = DispatchQueue(label: "spotmap.journey-store", qos: .utility)
+    private let fileURL: URL
 
-    func load() -> [JourneyRecord] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+    init() {
+        self.fileURL = Self.storeURL()
+    }
+
+    func load() async -> [JourneyRecord] {
+        await withCheckedContinuation { continuation in
+            queue.async { [fileURL] in
+                let records = Self.loadRecords(from: fileURL)
+                continuation.resume(returning: records)
+            }
+        }
+    }
+
+    func add(_ record: JourneyRecord) async -> [JourneyRecord] {
+        await mutate { all in
+            var updated = all
+            updated.insert(record, at: 0)
+            return updated
+        }
+    }
+
+    func delete(_ record: JourneyRecord) async -> [JourneyRecord] {
+        await mutate { all in
+            all.filter { $0.id != record.id }
+        }
+    }
+
+    private func mutate(_ transform: @escaping ([JourneyRecord]) -> [JourneyRecord]) async -> [JourneyRecord] {
+        await withCheckedContinuation { continuation in
+            queue.async { [fileURL] in
+                let existing = Self.loadRecords(from: fileURL)
+                let updated = transform(existing)
+                Self.persist(updated, to: fileURL)
+                continuation.resume(returning: updated)
+            }
+        }
+    }
+
+    private static func loadRecords(from fileURL: URL) -> [JourneyRecord] {
+        guard let data = try? Data(contentsOf: fileURL) else { return [] }
         return (try? JSONDecoder().decode([JourneyRecord].self, from: data)) ?? []
     }
 
-    func add(_ record: JourneyRecord) {
-        var all = load()
-        all.insert(record, at: 0)
-        persist(all)
-    }
-
-    func delete(_ record: JourneyRecord) {
-        var all = load()
-        all.removeAll { $0.id == record.id }
-        persist(all)
-    }
-
-    private func persist(_ all: [JourneyRecord]) {
+    private static func persist(_ all: [JourneyRecord], to fileURL: URL) {
         guard let data = try? JSONEncoder().encode(all) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        do {
+            try ensureDirectoryExists(for: fileURL)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            return
+        }
+    }
+
+    private static func storeURL() -> URL {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Spotmap", isDirectory: true)
+        return directory.appendingPathComponent("Journeys.v1.json")
+    }
+
+    private static func ensureDirectoryExists(for fileURL: URL) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 }
 
@@ -428,6 +514,14 @@ final class ExploreStore: ObservableObject {
     private let tilesKey = "ExploreTiles.v1"
     private let citiesKey = "ExploreCities.v1"
     private let zoom = 10
+    private let geocodeTileZoom = 8
+    private let geocodeCooldown: TimeInterval = 60 * 30
+    private var geocodeCache: [String: GeocodeCacheEntry] = [:]
+
+    private struct GeocodeCacheEntry {
+        let lastLookup: Date
+        let cityKey: String?
+    }
 
     private init() {
         visitedTiles = Self.loadSet(key: tilesKey)
@@ -456,18 +550,8 @@ final class ExploreStore: ObservableObject {
 
     private func ingestCities(start: CLLocationCoordinate2D, end: CLLocationCoordinate2D) async {
         let geocoder = CLGeocoder()
-
-        let startKey: String? = await withCheckedContinuation { cont in
-            geocoder.reverseGeocodeLocation(CLLocation(latitude: start.latitude, longitude: start.longitude)) { places, _ in
-                cont.resume(returning: Self.cityKey(from: places?.first))
-            }
-        }
-
-        let endKey: String? = await withCheckedContinuation { cont in
-            geocoder.reverseGeocodeLocation(CLLocation(latitude: end.latitude, longitude: end.longitude)) { places, _ in
-                cont.resume(returning: Self.cityKey(from: places?.first))
-            }
-        }
+        let startKey = await geocodeCityKey(for: start, using: geocoder)
+        let endKey = await geocodeCityKey(for: end, using: geocoder)
 
         await MainActor.run {
             var set = visitedCities
@@ -476,6 +560,30 @@ final class ExploreStore: ObservableObject {
             visitedCities = set
             Self.saveSet(set, key: citiesKey)
         }
+    }
+
+    private func geocodeCityKey(for coordinate: CLLocationCoordinate2D, using geocoder: CLGeocoder) async -> String? {
+        let tileKey = Self.tileId(lat: coordinate.latitude, lon: coordinate.longitude, zoom: geocodeTileZoom)
+        let now = Date()
+        let cachedEntry = await MainActor.run { geocodeCache[tileKey] }
+        if let cachedEntry, now.timeIntervalSince(cachedEntry.lastLookup) < geocodeCooldown {
+            return cachedEntry.cityKey
+        }
+        let fallbackCityKey = cachedEntry?.cityKey
+        let resolvedKey: String? = await withCheckedContinuation { cont in
+            geocoder.reverseGeocodeLocation(CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)) { places, error in
+                if error != nil {
+                    cont.resume(returning: fallbackCityKey)
+                    return
+                }
+                let cityKey = Self.cityKey(from: places?.first) ?? fallbackCityKey
+                cont.resume(returning: cityKey)
+            }
+        }
+        await MainActor.run {
+            geocodeCache[tileKey] = GeocodeCacheEntry(lastLookup: now, cityKey: resolvedKey ?? fallbackCityKey)
+        }
+        return resolvedKey ?? fallbackCityKey
     }
 
     nonisolated private static func cityKey(from placemark: CLPlacemark?) -> String? {
@@ -560,4 +668,3 @@ final class ExploreStore: ObservableObject {
         UserDefaults.standard.set(data, forKey: key)
     }
 }
-
