@@ -51,6 +51,10 @@ public struct Spot: Identifiable, Equatable, Hashable {
     }
 
     public func toRecord(existing: CKRecord? = nil) -> CKRecord {
+        toRecordWithTempAssetURL(existing: existing).record
+    }
+
+    public func toRecordWithTempAssetURL(existing: CKRecord? = nil) -> (record: CKRecord, tempAssetURL: URL?) {
         let record = existing ?? CKRecord(recordType: Self.recordType, recordID: id)
         record["title"] = title as CKRecordValue
         record["note"] = note as CKRecordValue
@@ -61,10 +65,10 @@ public struct Spot: Identifiable, Equatable, Hashable {
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("spot-photo-\(id.recordName).jpg")
             try? photoData.write(to: url, options: [.atomic])
             record["photo"] = CKAsset(fileURL: url)
+            return (record, url)
         } else {
             record["photo"] = nil
+            return (record, nil)
         }
-        return record
     }
 }
-

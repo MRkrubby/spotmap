@@ -160,8 +160,11 @@ final class CloudKitSpotService: SpotService {
 
     func save(spot: Spot) async throws -> Spot {
         try await assertCloudKitWorks()
-        let record = spot.toRecord()
+        let (record, tempAssetURL) = spot.toRecordWithTempAssetURL()
         let saved = try await db().save(record)
+        if let tempAssetURL {
+            try? FileManager.default.removeItem(at: tempAssetURL)
+        }
         guard let decoded = Spot(record: saved) else { throw ServiceError.recordDecodeFailed }
         return decoded
     }
@@ -271,4 +274,3 @@ private extension CKDatabase {
         }
     }
 }
-
