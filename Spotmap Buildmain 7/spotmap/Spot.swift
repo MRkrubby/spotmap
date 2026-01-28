@@ -71,7 +71,7 @@ public struct Spot: Identifiable, Equatable, Hashable {
         record["createdAt"] = createdAt as CKRecordValue
 
         if let photoData {
-            let tempFilename = "spot-photo-\(id.recordName)-\(UUID().uuidString).jpg"
+            let tempFilename = "spot-photo-\(UUID().uuidString).jpg"
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(tempFilename)
             do {
                 try photoData.write(to: url, options: [.atomic])
