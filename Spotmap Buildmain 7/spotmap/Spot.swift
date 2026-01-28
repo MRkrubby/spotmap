@@ -9,6 +9,7 @@ public struct Spot: Identifiable, Equatable, Hashable {
     public var location: CLLocation
     public var createdAt: Date
     public var photoData: Data?
+    public let photoAssetURL: URL?
 
     public var latitude: Double { location.coordinate.latitude }
     public var longitude: Double { location.coordinate.longitude }
@@ -27,6 +28,7 @@ public struct Spot: Identifiable, Equatable, Hashable {
         self.location = location
         self.createdAt = createdAt
         self.photoData = nil
+        self.photoAssetURL = nil
     }
 
     public init?(record: CKRecord) {
@@ -43,11 +45,18 @@ public struct Spot: Identifiable, Equatable, Hashable {
         self.location = location
         self.createdAt = createdAt
         let asset = record["photo"] as? CKAsset
-        var loadedPhoto: Data? = nil
-        if let url = asset?.fileURL {
-            loadedPhoto = try? Data(contentsOf: url)
+        self.photoData = nil
+        self.photoAssetURL = asset?.fileURL
+    }
+
+    public func loadPhotoData() async -> Data? {
+        if let photoData {
+            return photoData
         }
-        self.photoData = loadedPhoto
+        guard let url = photoAssetURL else { return nil }
+        return await Task.detached(priority: .utility) {
+            try? Data(contentsOf: url)
+        }.value
     }
 
     public func toRecord(existing: CKRecord? = nil) -> CKRecord {
