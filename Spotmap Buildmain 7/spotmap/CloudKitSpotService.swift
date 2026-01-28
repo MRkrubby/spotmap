@@ -192,19 +192,39 @@ final class CloudKitSpotService: SpotService {
         // Reduce payload: only request what we need.
         let desiredKeys = ["title", "note", "location", "createdAt"]
 
-        let (matchResults, _) = try await db().records(
-            matching: query,
-            resultsLimit: limit,
-            desiredKeys: desiredKeys
-        )
+        guard limit > 0 else { return [] }
 
-        // If the task was cancelled mid-flight, propagate quickly.
-        try Task.checkCancellation()
+        var aggregatedRecords: [CKRecord] = []
+        var cursor: CKQueryOperation.Cursor?
+        var remaining = limit
 
-        return matchResults.compactMap { _, result in
-            guard case .success(let record) = result else { return nil }
-            return Spot(record: record)
+        repeat {
+            let (matchResults, nextCursor) = try await db().records(
+                matching: query,
+                cursor: cursor,
+                resultsLimit: remaining,
+                desiredKeys: desiredKeys
+            )
+
+            aggregatedRecords.append(contentsOf: matchResults.compactMap { _, result in
+                guard case .success(let record) = result else { return nil }
+                return record
+            })
+
+            // If the task was cancelled mid-flight, propagate quickly.
+            try Task.checkCancellation()
+
+            cursor = nextCursor
+            remaining = max(0, limit - aggregatedRecords.count)
+        } while cursor != nil && remaining > 0
+
+        let sortedRecords = aggregatedRecords.sorted { lhs, rhs in
+            let lhsDate = lhs["createdAt"] as? Date ?? .distantPast
+            let rhsDate = rhs["createdAt"] as? Date ?? .distantPast
+            return lhsDate > rhsDate
         }
+
+        return sortedRecords.compactMap { Spot(record: $0) }
     }
 
     func deleteSpot(by id: CKRecord.ID) async throws {
@@ -246,11 +266,17 @@ private extension CKDatabase {
 
     func records(
         matching query: CKQuery,
+        cursor: CKQueryOperation.Cursor?,
         resultsLimit: Int,
         desiredKeys: [String]?
     ) async throws -> ([CKRecord.ID: Result<CKRecord, Error>], CKQueryOperation.Cursor?) {
         try await withCheckedThrowingContinuation { cont in
-            let op = CKQueryOperation(query: query)
+            let op: CKQueryOperation
+            if let cursor {
+                op = CKQueryOperation(cursor: cursor)
+            } else {
+                op = CKQueryOperation(query: query)
+            }
             op.resultsLimit = resultsLimit
             op.desiredKeys = desiredKeys
             op.qualityOfService = .userInitiated
