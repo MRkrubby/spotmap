@@ -16,14 +16,10 @@ struct SpotMapView: View {
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var friends: FriendsStore
     @StateObject private var vm: SpotMapViewModel
+    @StateObject private var mapCoordinator = SpotMapCoordinator(fog: FogOfWarStore.shared)
     
     @AppStorage("Explore.enabled") private var exploreEnabled: Bool = false
-    @ObservedObject private var explore = ExploreStore.shared
-    private let fog = FogOfWarStore.shared
     @State private var publishDebouncer = Debouncer()
-    @State private var fogDebouncer = Debouncer()
-    @State private var cameraDebouncer = Debouncer()
-    @StateObject private var fogCloudField = FogCloudField()
     
     @State private var selection: String? = nil
 
@@ -41,12 +37,32 @@ struct SpotMapView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                mapLayer
+                SpotMapMapLayer(
+                    vm: vm,
+                    exploreEnabled: $exploreEnabled,
+                    selection: $selection,
+                    coordinator: mapCoordinator,
+                    fogCloudField: mapCoordinator.fogCloudField
+                )
                 
                 // Minimal header (hide during navigation).
                 VStack(spacing: 10) {
                     if !nav.isNavigating {
-                        headerBar
+                        SpotMapHeader(
+                            vm: vm,
+                            exploreEnabled: $exploreEnabled,
+                            onOpenSpots: { showingSpotsList = true },
+                            onAddSpot: { vm.showingAdd = true },
+                            onOpenJourneys: { showingJourneysSheet = true },
+                            onOpenAchievements: { showingAchievements = true },
+                            onToggleTracking: { journeys.toggle() },
+                            onRefresh: {
+                                let c = vm.mapCenter
+                                vm.repo.refreshNearby(center: CLLocation(latitude: c.latitude, longitude: c.longitude), force: true)
+                            },
+                            onOpenSettings: { showingSettings = true },
+                            onFocusUser: { vm.focusOnUser() }
+                        )
                             .padding(.top, 10)
                             .padding(.horizontal, 12)
                         
@@ -73,18 +89,14 @@ struct SpotMapView: View {
             // - route preview
             // - navigation HUD
             .safeAreaInset(edge: .bottom) {
-                HomeBottomOverlay(
-                    repo: vm.repo,
+                SpotMapOverlays(
+                    vm: vm,
                     onOpenSpots: { showingSpotsList = true },
                     onAddSpot: { vm.showingAdd = true },
                     onOpenJourneys: { showingJourneysSheet = true },
                     onOpenSettings: { showingSettings = true },
                     onToggleTracking: { journeys.toggle() }
                 )
-                .environmentObject(nav)
-                .environmentObject(journeys)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
             }
             
             // Errors
@@ -103,20 +115,18 @@ struct SpotMapView: View {
                     Text(vm.repo.lastErrorMessage ?? "")
                 }
             )
-            
-            // Spot detail
-            .sheet(item: $vm.selectedSpot) { spot in
-                SpotDetailView(spot: spot, isShareEnabled: vm.repo.backend == .cloudKit)
-                    .environmentObject(vm.repo)
-                    .environmentObject(nav)
-                    .presentationDetents([.medium, .large])
-            }
-            
-            // Add spot
+            .spotMapSheetPresenter(
+                vm: vm,
+                showingSpotsList: $showingSpotsList,
+                showingSettings: $showingSettings,
+                showingJourneysSheet: $showingJourneysSheet,
+                showingAchievements: $showingAchievements
+            )
+
             .onReceive(vm.locationManager.$lastLocation.compactMap { $0 }) { loc in
                 // Fog-of-war reveal (20m buffer) while Explore mode is enabled.
                 if exploreEnabled {
-                    fog.reveal(location: loc)
+                    FogOfWarStore.shared.reveal(location: loc)
                 }
                 
                 // Friends publish is handled by RootTabView lifecycle,
@@ -136,54 +146,12 @@ struct SpotMapView: View {
                     Task { await friends.publish() }
                 }
             }
-            .sheet(isPresented: $vm.showingAdd) {
-                AddSpotView(
-                    initialCoordinate: vm.mapCenter,
-                    onAdd: { title, note, coord, photoData in
-                        Task { await vm.repo.addSpot(title: title, note: note, coordinate: coord, photoData: photoData) }
-                    }
-                )
-                .presentationDetents([.medium, .large])
-            }
-            
-            // Spots list
-            .sheet(isPresented: $showingSpotsList) {
-                SpotsListView(repo: vm.repo, referenceLocation: vm.locationManager.lastLocation) { spot in
-                    vm.selectedSpot = spot
-                    vm.focus(on: spot.location.coordinate)
-                }
-                .presentationDetents([.medium, .large])
-            }
-            
-            // Settings
-            .sheet(isPresented: $showingSettings) {
-                SettingsView(
-                    repo: vm.repo,
-                    currentCenter: { vm.mapCenter }
-                )
-                .presentationDetents([.medium])
-            }
-            
-            // Journeys
-            .sheet(isPresented: $showingJourneysSheet) {
-                JourneysView()
-                    .environmentObject(journeys)
-                    .presentationDetents([.medium, .large])
-            }
-            
-            // Achievements
-            .sheet(isPresented: $showingAchievements) {
-                AchievementsView()
-                    .environmentObject(journeys)
-                    .presentationDetents([.medium, .large])
-            }
-            
             .onAppear {
                 // RootTabView manages friends auto-refresh/publish lifecycle.
                 vm.onAppear()
                 vm.locationManager.setHighAccuracy(exploreEnabled)
                 if exploreEnabled, let loc = vm.locationManager.lastLocation {
-                    fog.reveal(location: loc, minMoveMeters: 0)
+                    FogOfWarStore.shared.reveal(location: loc, minMoveMeters: 0)
                 }
             }
             .onChange(of: nav.recenterToken) { _, _ in
@@ -192,238 +160,6 @@ struct SpotMapView: View {
             .onOpenURL { url in
                 self.handleDeepLink(url)
             }
-        }
-    }
-    
-    private var headerBar: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22, height: 22)
-                    .accessibilityHidden(true)
-                
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("SpotMap")
-                        .font(.system(size: 16, weight: .bold))
-                    Text(vm.repo.backend.title)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            Spacer(minLength: 0)
-            
-            SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie") {
-                vm.focusOnUser()
-            }
-            
-            // Quick toggle: Achievement map layer (Explore)
-            SpotCircleButton(
-                systemImage: exploreEnabled ? "square.3.layers.3d.down.right" : "square.3.layers.3d",
-                accessibilityLabel: "Achievement kaartlaag"
-            ) {
-                let gen = UIImpactFeedbackGenerator(style: .light)
-                gen.impactOccurred()
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    exploreEnabled.toggle()
-                }
-            }
-            
-            Menu {
-                Button {
-                    showingSpotsList = true
-                } label: { Label("Spots", systemImage: "list.bullet") }
-                
-                Button {
-                    vm.showingAdd = true
-                } label: { Label("Nieuwe spot", systemImage: "mappin.and.ellipse") }
-                
-                Button {
-                    showingJourneysSheet = true
-                } label: { Label("Journeys", systemImage: "car") }
-                
-                Button {
-                    showingAchievements = true
-                } label: { Label("Achievements", systemImage: "trophy") }
-                
-                Button {
-                    journeys.toggle()
-                } label: {
-                    Label(journeys.trackingEnabled ? "Tracking uit" : "Tracking aan",
-                          systemImage: journeys.trackingEnabled ? "location.slash" : "location.fill")
-                }
-                
-                Divider()
-                
-                Button {
-                    let c = vm.mapCenter
-                    vm.repo.refreshNearby(center: CLLocation(latitude: c.latitude, longitude: c.longitude), force: true)
-                } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                
-                Button {
-                    showingSettings = true
-                } label: { Label("Instellingen", systemImage: "gearshape") }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Circle().strokeBorder(.white.opacity(0.12)))
-                        .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
-                        .shadow(radius: 6)
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: SpotBrand.iconSize, weight: .semibold))
-                }
-            }
-            .accessibilityLabel("Menu")
-        }
-        .padding(10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 8)
-    }
-    
-    private var mapLayer: some View {
-        MapReader { proxy in
-            GeometryReader { geo in
-                ZStack {
-                    Map(position: $vm.mapPosition, selection: $selection) {
-                    // Your tracked path since app start.
-                    let session = journeys.sessionPolyline()
-                    if session.count >= 2 {
-                        MapPolyline(MKPolyline(coordinates: session, count: session.count))
-                            .stroke(.blue.opacity(0.25), lineWidth: 7)
-                    }
-                    
-                    if let r = nav.route {
-                        MapPolyline(r.polyline)
-                            .stroke(.blue, lineWidth: 8)
-                    }
-                    
-                    // Friends (optional)
-                    ForEach(friends.friends) { f in
-                        if let c = f.coordinate {
-                            Marker(f.displayName, coordinate: c)
-                        }
-                        if let data = f.lastJourneyZlib,
-                           let poly = FriendRouteDecoder.polyline(fromZlib: data) {
-                            MapPolyline(poly)
-                                .stroke(.blue.opacity(0.35), lineWidth: 4)
-                        }
-                    }
-                    
-                    // NOTE: clouds/trees are drawn as a lightweight overlay (NOT Map annotations)
-                    // to keep taps and scrolling responsive.
-                    
-                    if let dest = nav.destination?.placemark.coordinate {
-                        Marker(nav.destinationName ?? "Bestemming", coordinate: dest)
-                    }
-                    
-                    ForEach(vm.repo.spots) { spot in
-                        Marker(spot.title, coordinate: spot.location.coordinate)
-                            .tag(spot.id.recordName)
-                    }
-                    
-                    UserAnnotation()
-                    }
-                    .mapStyle(exploreEnabled ? .standard(elevation: .flat) : .standard)
-                    .mapControls {
-                        MapCompass()
-                        MapScaleView()
-                        MapUserLocationButton()
-                    }
-                    .onMapCameraChange(frequency: .continuous) { context in
-                        vm.mapCenterChanged(to: context.region.center)
-                        if exploreEnabled {
-                            cameraDebouncer.schedule(delay: .milliseconds(200)) {
-                                scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
-                            }
-                        }
-                    }
-                    .onChange(of: selection) { _, newValue in
-                        guard let recordName = newValue else { return }
-                        if let spot = vm.repo.spot(withRecordName: recordName) {
-                            vm.selectedSpot = spot
-                        }
-                    }
-                    .onAppear {
-                        if exploreEnabled {
-                            fogCloudField.start(store: fog)
-                            scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
-                            // Ensure we update after first layout (MapProxy.convert can return nil early).
-                            Task {
-                                try? await Task.sleep(for: .milliseconds(350))
-                                await MainActor.run {
-                                    guard exploreEnabled else { return }
-                                    scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
-                                }
-                            }
-                        }
-                    }
-                    .onChange(of: exploreEnabled) { _, newValue in
-                        if newValue {
-                            fogCloudField.start(store: fog)
-                            scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
-                            // Ensure we update after first layout (MapProxy.convert can return nil early).
-                            Task {
-                                try? await Task.sleep(for: .milliseconds(350))
-                                await MainActor.run {
-                                    guard exploreEnabled else { return }
-                                    scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
-                                }
-                            }
-                        } else {
-                            fogCloudField.stop()
-                        }
-                    }
-                }
-
-                // TRUE 3D clouds overlay.
-                // Only render when Explore is enabled.
-                if exploreEnabled {
-                    // Convert cloud world coordinates to screen-space points.
-                    // We keep clouds pinned to the map content (screen-space) and render them as true 3D
-                    // in a transparent SceneKit overlay.
-                    //
-                    // IMPORTANT:
-                    // Keep clouds world-anchored so they stay fixed relative to map content while
-                    // the camera moves around them. `MapProxy.convert` already accounts for the
-                    // current camera heading/pitch, so we keep the projected points as-is.
-                    let items: [CloudVoxelItem] = fogCloudField.clouds.compactMap { c in
-                        guard let pt = proxy.convert(c.coordinate, to: .local) else { return nil }
-                        return CloudVoxelItem(
-                            id: c.id,
-                            screenPoint: pt,
-                            sizePoints: c.sizePoints,
-                            altitudeMeters: c.altitudeMeters,
-                            asset: c.asset,
-                            seed: c.seed
-                        )
-                    }
-
-                    CloudVoxelOverlayView(
-                        items: items,
-                        // Keep cloud assets independent from map rotation/tilt.
-                        headingDegrees: 0,
-                        pitchDegrees: 0,
-                        viewportSize: geo.size
-                    )
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .allowsHitTesting(false)
-                }
-            }
-        }
-    }
-    
-    
-    // MARK: - Fog cloud updates
-
-    private func scheduleFogCloudUpdate(proxy: MapProxy, canvasSize: CGSize) {
-        // Throttle to avoid recomputing clouds too often while GPS updates are flowing.
-        fogDebouncer.schedule(delay: .milliseconds(120)) {
-            fogCloudField.updateViewport(proxy: proxy, canvasSize: canvasSize, centerCoordinate: vm.mapCenter)
         }
     }
 
@@ -635,4 +371,427 @@ struct SpotMapView: View {
         }
     }
 
+}
+
+// MARK: - Subviews
+
+private struct SpotMapHeader: View {
+    @EnvironmentObject private var journeys: JourneyRepository
+    @ObservedObject var vm: SpotMapViewModel
+    @Binding var exploreEnabled: Bool
+    let onOpenSpots: () -> Void
+    let onAddSpot: () -> Void
+    let onOpenJourneys: () -> Void
+    let onOpenAchievements: () -> Void
+    let onToggleTracking: () -> Void
+    let onRefresh: () -> Void
+    let onOpenSettings: () -> Void
+    let onFocusUser: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("SpotMap")
+                        .font(.system(size: 16, weight: .bold))
+                    Text(vm.repo.backend.title)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie") {
+                onFocusUser()
+            }
+
+            // Quick toggle: Achievement map layer (Explore)
+            SpotCircleButton(
+                systemImage: exploreEnabled ? "square.3.layers.3d.down.right" : "square.3.layers.3d",
+                accessibilityLabel: "Achievement kaartlaag"
+            ) {
+                let gen = UIImpactFeedbackGenerator(style: .light)
+                gen.impactOccurred()
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    exploreEnabled.toggle()
+                }
+            }
+
+            Menu {
+                Button(action: onOpenSpots) {
+                    Label("Spots", systemImage: "list.bullet")
+                }
+
+                Button(action: onAddSpot) {
+                    Label("Nieuwe spot", systemImage: "mappin.and.ellipse")
+                }
+
+                Button(action: onOpenJourneys) {
+                    Label("Journeys", systemImage: "car")
+                }
+
+                Button(action: onOpenAchievements) {
+                    Label("Achievements", systemImage: "trophy")
+                }
+
+                Button(action: onToggleTracking) {
+                    Label(
+                        journeys.trackingEnabled ? "Tracking uit" : "Tracking aan",
+                        systemImage: journeys.trackingEnabled ? "location.slash" : "location.fill"
+                    )
+                }
+
+                Divider()
+
+                Button(action: onRefresh) {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+
+                Button(action: onOpenSettings) {
+                    Label("Instellingen", systemImage: "gearshape")
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Circle().strokeBorder(.white.opacity(0.12)))
+                        .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
+                        .shadow(radius: 6)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                }
+            }
+            .accessibilityLabel("Menu")
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .shadow(radius: 8)
+    }
+}
+
+private struct SpotMapOverlays: View {
+    @EnvironmentObject private var nav: NavigationManager
+    @EnvironmentObject private var journeys: JourneyRepository
+    @ObservedObject var vm: SpotMapViewModel
+    let onOpenSpots: () -> Void
+    let onAddSpot: () -> Void
+    let onOpenJourneys: () -> Void
+    let onOpenSettings: () -> Void
+    let onToggleTracking: () -> Void
+
+    var body: some View {
+        HomeBottomOverlay(
+            repo: vm.repo,
+            onOpenSpots: onOpenSpots,
+            onAddSpot: onAddSpot,
+            onOpenJourneys: onOpenJourneys,
+            onOpenSettings: onOpenSettings,
+            onToggleTracking: onToggleTracking
+        )
+        .environmentObject(nav)
+        .environmentObject(journeys)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+    }
+}
+
+private struct SpotMapMapLayer: View {
+    @EnvironmentObject private var nav: NavigationManager
+    @EnvironmentObject private var friends: FriendsStore
+    @EnvironmentObject private var journeys: JourneyRepository
+    @ObservedObject var vm: SpotMapViewModel
+    @Binding var exploreEnabled: Bool
+    @Binding var selection: String?
+    @ObservedObject var coordinator: SpotMapCoordinator
+    @ObservedObject var fogCloudField: FogCloudField
+
+    var body: some View {
+        MapReader { proxy in
+            GeometryReader { geo in
+                ZStack {
+                    Map(position: $vm.mapPosition, selection: $selection) {
+                        // Your tracked path since app start.
+                        let session = journeys.sessionPolyline()
+                        if session.count >= 2 {
+                            MapPolyline(MKPolyline(coordinates: session, count: session.count))
+                                .stroke(.blue.opacity(0.25), lineWidth: 7)
+                        }
+
+                        if let r = nav.route {
+                            MapPolyline(r.polyline)
+                                .stroke(.blue, lineWidth: 8)
+                        }
+
+                        // Friends (optional)
+                        ForEach(friends.friends) { f in
+                            if let c = f.coordinate {
+                                Marker(f.displayName, coordinate: c)
+                            }
+                            if let data = f.lastJourneyZlib,
+                               let poly = FriendRouteDecoder.polyline(fromZlib: data) {
+                                MapPolyline(poly)
+                                    .stroke(.blue.opacity(0.35), lineWidth: 4)
+                            }
+                        }
+
+                        // NOTE: clouds/trees are drawn as a lightweight overlay (NOT Map annotations)
+                        // to keep taps and scrolling responsive.
+
+                        if let dest = nav.destination?.placemark.coordinate {
+                            Marker(nav.destinationName ?? "Bestemming", coordinate: dest)
+                        }
+
+                        ForEach(vm.repo.spots) { spot in
+                            Marker(spot.title, coordinate: spot.location.coordinate)
+                                .tag(spot.id.recordName)
+                        }
+
+                        UserAnnotation()
+                    }
+                    .mapStyle(exploreEnabled ? .standard(elevation: .flat) : .standard)
+                    .mapControls {
+                        MapCompass()
+                        MapScaleView()
+                        MapUserLocationButton()
+                    }
+                    .onMapCameraChange(frequency: .continuous) { context in
+                        coordinator.handleCameraChange(
+                            context: context,
+                            exploreEnabled: exploreEnabled,
+                            proxy: proxy,
+                            canvasSize: geo.size
+                        ) { center in
+                            vm.mapCenterChanged(to: center)
+                        }
+                    }
+                    .onChange(of: selection) { _, newValue in
+                        coordinator.handleSelectionChange(recordName: newValue) { recordName in
+                            if let spot = vm.repo.spot(withRecordName: recordName) {
+                                vm.selectedSpot = spot
+                            }
+                        }
+                    }
+                    .onAppear {
+                        coordinator.handleMapAppear(
+                            exploreEnabled: exploreEnabled,
+                            proxy: proxy,
+                            canvasSize: geo.size,
+                            centerCoordinate: vm.mapCenter
+                        )
+                    }
+                    .onChange(of: exploreEnabled) { _, newValue in
+                        coordinator.handleExploreChange(
+                            exploreEnabled: newValue,
+                            proxy: proxy,
+                            canvasSize: geo.size,
+                            centerCoordinate: vm.mapCenter
+                        )
+                    }
+                }
+
+                // TRUE 3D clouds overlay.
+                // Only render when Explore is enabled.
+                if exploreEnabled {
+                    // Convert cloud world coordinates to screen-space points.
+                    // We keep clouds pinned to the map content (screen-space) and render them as true 3D
+                    // in a transparent SceneKit overlay.
+                    //
+                    // IMPORTANT:
+                    // Keep clouds world-anchored so they stay fixed relative to map content while
+                    // the camera moves around them. `MapProxy.convert` already accounts for the
+                    // current camera heading/pitch, so we keep the projected points as-is.
+                    let items = fogCloudField.clouds.compactMap { cloud in
+                        guard let pt = proxy.convert(cloud.coordinate, to: .local) else { return nil }
+                        return CloudVoxelItem(
+                            id: cloud.id,
+                            screenPoint: pt,
+                            sizePoints: cloud.sizePoints,
+                            altitudeMeters: cloud.altitudeMeters,
+                            asset: cloud.asset,
+                            seed: cloud.seed
+                        )
+                    }
+
+                    CloudVoxelOverlayView(
+                        items: items,
+                        // Keep cloud assets independent from map rotation/tilt.
+                        headingDegrees: 0,
+                        pitchDegrees: 0,
+                        viewportSize: geo.size
+                    )
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+}
+
+private struct SpotMapSheetPresenter: ViewModifier {
+    @EnvironmentObject private var journeys: JourneyRepository
+    @EnvironmentObject private var nav: NavigationManager
+    @ObservedObject var vm: SpotMapViewModel
+    @Binding var showingSpotsList: Bool
+    @Binding var showingSettings: Bool
+    @Binding var showingJourneysSheet: Bool
+    @Binding var showingAchievements: Bool
+
+    func body(content: Content) -> some View {
+        content
+            // Spot detail
+            .sheet(item: $vm.selectedSpot) { spot in
+                SpotDetailView(spot: spot, isShareEnabled: vm.repo.backend == .cloudKit)
+                    .environmentObject(vm.repo)
+                    .environmentObject(nav)
+                    .presentationDetents([.medium, .large])
+            }
+
+            // Add spot
+            .sheet(isPresented: $vm.showingAdd) {
+                AddSpotView(
+                    initialCoordinate: vm.mapCenter,
+                    onAdd: { title, note, coord, photoData in
+                        Task { await vm.repo.addSpot(title: title, note: note, coordinate: coord, photoData: photoData) }
+                    }
+                )
+                .presentationDetents([.medium, .large])
+            }
+
+            // Spots list
+            .sheet(isPresented: $showingSpotsList) {
+                SpotsListView(repo: vm.repo, referenceLocation: vm.locationManager.lastLocation) { spot in
+                    vm.selectedSpot = spot
+                    vm.focus(on: spot.location.coordinate)
+                }
+                .presentationDetents([.medium, .large])
+            }
+
+            // Settings
+            .sheet(isPresented: $showingSettings) {
+                SettingsView(
+                    repo: vm.repo,
+                    currentCenter: { vm.mapCenter }
+                )
+                .presentationDetents([.medium])
+            }
+
+            // Journeys
+            .sheet(isPresented: $showingJourneysSheet) {
+                JourneysView()
+                    .environmentObject(journeys)
+                    .presentationDetents([.medium, .large])
+            }
+
+            // Achievements
+            .sheet(isPresented: $showingAchievements) {
+                SpotMapView.AchievementsView()
+                    .environmentObject(journeys)
+                    .presentationDetents([.medium, .large])
+            }
+    }
+}
+
+private extension View {
+    func spotMapSheetPresenter(
+        vm: SpotMapViewModel,
+        showingSpotsList: Binding<Bool>,
+        showingSettings: Binding<Bool>,
+        showingJourneysSheet: Binding<Bool>,
+        showingAchievements: Binding<Bool>
+    ) -> some View {
+        modifier(
+            SpotMapSheetPresenter(
+                vm: vm,
+                showingSpotsList: showingSpotsList,
+                showingSettings: showingSettings,
+                showingJourneysSheet: showingJourneysSheet,
+                showingAchievements: showingAchievements
+            )
+        )
+    }
+}
+
+@MainActor
+final class SpotMapCoordinator: ObservableObject {
+    private let fog: FogOfWarStore
+    private let fogDebouncer = Debouncer()
+    let fogCloudField: FogCloudField
+
+    init(fog: FogOfWarStore, fogCloudField: FogCloudField = FogCloudField()) {
+        self.fog = fog
+        self.fogCloudField = fogCloudField
+    }
+
+    func handleCameraChange(
+        context: MapCameraUpdateContext,
+        exploreEnabled: Bool,
+        proxy: MapProxy,
+        canvasSize: CGSize,
+        onCenterChange: (CLLocationCoordinate2D) -> Void
+    ) {
+        let center = context.region.center
+        onCenterChange(center)
+        guard exploreEnabled else { return }
+        scheduleFogCloudUpdate(proxy: proxy, canvasSize: canvasSize, centerCoordinate: center)
+    }
+
+    func handleSelectionChange(recordName: String?, onSelect: (String) -> Void) {
+        guard let recordName else { return }
+        onSelect(recordName)
+    }
+
+    func handleMapAppear(
+        exploreEnabled: Bool,
+        proxy: MapProxy,
+        canvasSize: CGSize,
+        centerCoordinate: CLLocationCoordinate2D
+    ) {
+        guard exploreEnabled else { return }
+        fogCloudField.start(store: fog)
+        scheduleFogCloudUpdate(proxy: proxy, canvasSize: canvasSize, centerCoordinate: centerCoordinate)
+        // Ensure we update after first layout (MapProxy.convert can return nil early).
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            await MainActor.run {
+                scheduleFogCloudUpdate(proxy: proxy, canvasSize: canvasSize, centerCoordinate: centerCoordinate)
+            }
+        }
+    }
+
+    func handleExploreChange(
+        exploreEnabled: Bool,
+        proxy: MapProxy,
+        canvasSize: CGSize,
+        centerCoordinate: CLLocationCoordinate2D
+    ) {
+        if exploreEnabled {
+            fogCloudField.start(store: fog)
+            scheduleFogCloudUpdate(proxy: proxy, canvasSize: canvasSize, centerCoordinate: centerCoordinate)
+            // Ensure we update after first layout (MapProxy.convert can return nil early).
+            Task {
+                try? await Task.sleep(for: .milliseconds(350))
+                await MainActor.run {
+                    scheduleFogCloudUpdate(proxy: proxy, canvasSize: canvasSize, centerCoordinate: centerCoordinate)
+                }
+            }
+        } else {
+            fogCloudField.stop()
+        }
+    }
+
+    private func scheduleFogCloudUpdate(proxy: MapProxy, canvasSize: CGSize, centerCoordinate: CLLocationCoordinate2D) {
+        // Throttle to avoid recomputing clouds too often while GPS updates are flowing.
+        fogDebouncer.schedule(delay: .milliseconds(120)) {
+            self.fogCloudField.updateViewport(proxy: proxy, canvasSize: canvasSize, centerCoordinate: centerCoordinate)
+        }
+    }
 }
