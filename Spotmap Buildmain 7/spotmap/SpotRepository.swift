@@ -236,6 +236,7 @@ private extension SpotRepository {
 @MainActor
 private final class SpotCache {
     private var key: String
+    private let photoStore = SpotPhotoStore.shared
 
     init(key: String) {
         self.key = key
@@ -246,14 +247,27 @@ private final class SpotCache {
     }
 
     func load() -> [Spot] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([CacheSpot].self, from: data))?.map { $0.toSpot() } ?? []
+        loadCacheSpots().map { $0.toSpot(photoStore: photoStore) }
     }
 
     func save(_ spots: [Spot]) {
-        let cache = spots.map(CacheSpot.init)
+        let previous = loadCacheSpots()
+        let cache = spots.map { CacheSpot($0, photoStore: photoStore) }
         guard let data = try? JSONEncoder().encode(cache) else { return }
         UserDefaults.standard.set(data, forKey: key)
+        removeOrphanedPhotos(previous: previous, current: cache)
+    }
+
+    private func loadCacheSpots() -> [CacheSpot] {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([CacheSpot].self, from: data)) ?? []
+    }
+
+    private func removeOrphanedPhotos(previous: [CacheSpot], current: [CacheSpot]) {
+        let currentFiles = Set(current.compactMap(\.photoFilename))
+        let previousFiles = Set(previous.compactMap(\.photoFilename))
+        let orphaned = previousFiles.subtracting(currentFiles)
+        orphaned.forEach { photoStore.deletePhoto(filename: $0) }
     }
 
     private struct CacheSpot: Codable {
@@ -263,24 +277,36 @@ private final class SpotCache {
         let lat: Double
         let lon: Double
         let createdAt: Date
+        let photoFilename: String?
 
-        init(_ spot: Spot) {
+        init(_ spot: Spot, photoStore: SpotPhotoStore) {
             self.recordName = spot.id.recordName
             self.title = spot.title
             self.note = spot.note
             self.lat = spot.latitude
             self.lon = spot.longitude
             self.createdAt = spot.createdAt
+            if let photoData = spot.photoData {
+                let filename = photoStore.filename(for: recordName)
+                photoStore.savePhotoData(photoData, filename: filename)
+                photoFilename = filename
+            } else {
+                photoFilename = nil
+            }
         }
 
-        func toSpot() -> Spot {
-            Spot(
+        func toSpot(photoStore: SpotPhotoStore) -> Spot {
+            var spot = Spot(
                 id: CKRecord.ID(recordName: recordName),
                 title: title,
                 note: note,
                 location: CLLocation(latitude: lat, longitude: lon),
                 createdAt: createdAt
             )
+            if let photoFilename {
+                spot.photoData = photoStore.loadPhotoData(filename: photoFilename)
+            }
+            return spot
         }
     }
 }
