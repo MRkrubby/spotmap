@@ -145,6 +145,7 @@ final class NavigationManager: NSObject, ObservableObject {
 
         calculateTask = Task { [weak self] in
             guard let self else { return }
+            defer { self.isCalculating = false }
 
             // Build request
             let request = MKDirections.Request()
@@ -174,7 +175,6 @@ final class NavigationManager: NSObject, ObservableObject {
                 self.clearRoute(keepDestination: true)
             }
 
-            self.isCalculating = false
         }
     }
 
