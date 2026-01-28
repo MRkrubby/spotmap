@@ -2,6 +2,11 @@ import Foundation
 import Combine
 import CoreLocation
 import CloudKit
+#if canImport(Security)
+import Security
+import CoreFoundation
+import Darwin
+#endif
 
 // MARK: - Friends (Life360-style, CloudKit prototype)
 
@@ -25,6 +30,17 @@ struct FriendProfile: Identifiable, Hashable, Codable {
 /// Named `FriendsStore` (instead of `FriendsRepository`) to avoid symbol clashes
 /// if a project or dependency also defines a `FriendsRepository` type.
 final class FriendsStore: ObservableObject {
+    enum FriendsStoreError: LocalizedError {
+        case cloudKitNotAvailable(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .cloudKitNotAvailable(let message):
+                return message
+            }
+        }
+    }
+
     @Published private(set) var me: FriendProfile
     @Published private(set) var friends: [FriendProfile] = []
     @Published var isEnabled: Bool = true
@@ -240,25 +256,35 @@ final class FriendsStore: ObservableObject {
     }
 
     private func ensureCloudKitAvailable() async throws {
+        // 1) Entitlement check (fast, local)
+        guard Self.hasCloudKitEntitlement() else {
+            throw FriendsStoreError.cloudKitNotAvailable(
+                "CloudKit entitlement ontbreekt. Zet iCloud → CloudKit aan in Signing & Capabilities."
+            )
+        }
+
         // Create container lazily. If the capability isn't configured, calls below
         // will throw, but we won't crash at app launch.
         if container == nil {
             container = CKContainer.default()
         }
         guard let container else {
-            throw NSError(domain: "FriendsStore", code: -11, userInfo: [NSLocalizedDescriptionKey: "CloudKit container unavailable"])
+            throw FriendsStoreError.cloudKitNotAvailable("CloudKit container unavailable.")
         }
 
         let status = try await container.accountStatus()
-        guard status == .available else {
-            throw NSError(domain: "FriendsStore", code: -12, userInfo: [NSLocalizedDescriptionKey: "iCloud is not available (status: \(status.rawValue))"])
-        }
+        try ensureAccountStatusOK(status)
     }
 
     @MainActor
     private func disableIfEntitlementOrAccountIssue(_ error: Error) {
         // If CloudKit isn't configured or the user isn't signed in, keep the app stable
         // by disabling the feature and stopping background refresh.
+        if error is FriendsStoreError {
+            isEnabled = false
+            stopAutoRefresh()
+            return
+        }
         if let ck = error as? CKError {
             switch ck.code {
             case .notAuthenticated, .permissionFailure:
@@ -279,5 +305,68 @@ final class FriendsStore: ObservableObject {
         return FriendProfile(code: code, displayName: name,
                              lastLat: loc?.coordinate.latitude, lastLon: loc?.coordinate.longitude,
                              updatedAt: updatedAt, lastJourneyZlib: data)
+    }
+
+    private static func hasCloudKitEntitlement() -> Bool {
+#if canImport(Security)
+        // Dynamically look up SecTask symbols to avoid compile-time dependency on platforms where they're unavailable.
+        // If unavailable at runtime, return false and let account status gating handle UX.
+        typealias SecTaskRef = CFTypeRef
+        typealias SecTaskCreateFromSelfFn = @convention(c) (CFAllocator?) -> SecTaskRef?
+        typealias SecTaskCopyValueForEntitlementFn = @convention(c) (SecTaskRef, CFString, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> CFTypeRef?
+
+        // Resolve symbols using dlsym to prevent hard references on unsupported platforms.
+        guard let handle = dlopen(nil, RTLD_NOW) else { return false }
+        defer { dlclose(handle) }
+
+        guard let createSym = dlsym(handle, "SecTaskCreateFromSelf"),
+              let copySym = dlsym(handle, "SecTaskCopyValueForEntitlement") else {
+            return false
+        }
+        let SecTaskCreateFromSelf = unsafeBitCast(createSym, to: SecTaskCreateFromSelfFn.self)
+        let SecTaskCopyValueForEntitlement = unsafeBitCast(copySym, to: SecTaskCopyValueForEntitlementFn.self)
+
+        guard let task = SecTaskCreateFromSelf(kCFAllocatorDefault) else { return false }
+        let key: CFString = "com.apple.developer.icloud-services" as CFString
+        let value: CFTypeRef? = SecTaskCopyValueForEntitlement(task, key, nil)
+        guard let value else { return false }
+
+        // Handle both array and string representations defensively.
+        if CFGetTypeID(value) == CFArrayGetTypeID(),
+           let arr = value as? [Any] {
+            return arr.contains { item in
+                guard let s = item as? String else { return false }
+                return s == "CloudKit" || s == "CloudKit-Anonymous"
+            }
+        }
+
+        if let s = value as? String {
+            return s == "CloudKit" || s == "CloudKit-Anonymous"
+        }
+
+        return false
+#else
+        // If Security framework isn't available (e.g., certain platforms),
+        // fall back to assuming CloudKit entitlement might be present. The
+        // subsequent CloudKit account status check will still gate usage.
+        return true
+#endif
+    }
+
+    private func ensureAccountStatusOK(_ status: CKAccountStatus) throws {
+        switch status {
+        case .available:
+            return
+        case .noAccount:
+            throw FriendsStoreError.cloudKitNotAvailable("Geen iCloud account ingelogd op dit apparaat.")
+        case .restricted:
+            throw FriendsStoreError.cloudKitNotAvailable("iCloud is restricted op dit apparaat.")
+        case .temporarilyUnavailable:
+            throw FriendsStoreError.cloudKitNotAvailable("iCloud is tijdelijk niet beschikbaar.")
+        case .couldNotDetermine:
+            throw FriendsStoreError.cloudKitNotAvailable("Kon iCloud status niet bepalen. Check iCloud/CloudKit instellingen.")
+        @unknown default:
+            throw FriendsStoreError.cloudKitNotAvailable("Onbekende iCloud status. Check iCloud/CloudKit instellingen.")
+        }
     }
 }
