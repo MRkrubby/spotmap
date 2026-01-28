@@ -196,31 +196,13 @@ final class CloudKitSpotService: SpotService {
 
         guard limit > 0 else { return [] }
 
-        var aggregatedRecords: [CKRecord] = []
-        var cursor: CKQueryOperation.Cursor?
-        var remaining = limit
+        let records = try await db().records(
+            matching: query,
+            resultsLimit: limit,
+            desiredKeys: desiredKeys
+        )
 
-        repeat {
-            let (matchResults, nextCursor) = try await db().records(
-                matching: query,
-                cursor: cursor,
-                resultsLimit: remaining,
-                desiredKeys: desiredKeys
-            )
-
-            aggregatedRecords.append(contentsOf: matchResults.compactMap { _, result in
-                guard case .success(let record) = result else { return nil }
-                return record
-            })
-
-            // If the task was cancelled mid-flight, propagate quickly.
-            try Task.checkCancellation()
-
-            cursor = nextCursor
-            remaining = max(0, limit - aggregatedRecords.count)
-        } while cursor != nil && remaining > 0
-
-        let sortedRecords = aggregatedRecords.sorted { lhs, rhs in
+        let sortedRecords = records.sorted { lhs, rhs in
             let lhsDate = lhs["createdAt"] as? Date ?? .distantPast
             let rhsDate = rhs["createdAt"] as? Date ?? .distantPast
             return lhsDate > rhsDate
@@ -268,10 +250,40 @@ private extension CKDatabase {
 
     func records(
         matching query: CKQuery,
+        resultsLimit: Int,
+        desiredKeys: [String]?
+    ) async throws -> [CKRecord] {
+        guard resultsLimit > 0 else { return [] }
+
+        var aggregated: [CKRecord] = []
+        var cursor: CKQueryOperation.Cursor?
+        var remaining = resultsLimit
+
+        repeat {
+            let (pageResults, nextCursor) = try await fetchRecordsPage(
+                matching: query,
+                cursor: cursor,
+                resultsLimit: remaining,
+                desiredKeys: desiredKeys
+            )
+            aggregated.append(contentsOf: pageResults)
+
+            // If the task was cancelled mid-flight, propagate quickly.
+            try Task.checkCancellation()
+
+            cursor = nextCursor
+            remaining = max(0, resultsLimit - aggregated.count)
+        } while cursor != nil && remaining > 0
+
+        return aggregated
+    }
+
+    private func fetchRecordsPage(
+        matching query: CKQuery,
         cursor: CKQueryOperation.Cursor?,
         resultsLimit: Int,
         desiredKeys: [String]?
-    ) async throws -> ([CKRecord.ID: Result<CKRecord, Error>], CKQueryOperation.Cursor?) {
+    ) async throws -> ([CKRecord], CKQueryOperation.Cursor?) {
         try await withCheckedThrowingContinuation { cont in
             let op: CKQueryOperation
             if let cursor {
@@ -283,10 +295,11 @@ private extension CKDatabase {
             op.desiredKeys = desiredKeys
             op.qualityOfService = .userInitiated
 
-            var results: [CKRecord.ID: Result<CKRecord, Error>] = [:]
+            var results: [CKRecord] = []
 
-            op.recordMatchedBlock = { recordID, result in
-                results[recordID] = result
+            op.recordMatchedBlock = { _, result in
+                guard case .success(let record) = result else { return }
+                results.append(record)
             }
 
             op.queryResultBlock = { result in
