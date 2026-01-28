@@ -55,6 +55,8 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
     private let minDistanceBetweenPoints: CLLocationDistance = 7
     private let minTimeBetweenPoints: TimeInterval = 2
     private let maxAcceptableAccuracy: CLLocationAccuracy = 65
+    private let maxSessionPoints: Int = 3000
+    private let sessionPointTimeWindow: TimeInterval = 6 * 60 * 60
 
     // Auto segmentation
     private let stationarySpeedThresholdMps: Double = 1.0       // ~3.6 km/h
@@ -268,6 +270,7 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         // Add to session points (always)
         sessionPoints.append(JourneyPoint(lat: loc.coordinate.latitude, lon: loc.coordinate.longitude, ts: loc.timestamp, speedMps: currentSpeedMps))
         sessionLastAcceptedLocation = loc
+        pruneSessionPoints(now: loc.timestamp)
 
         // Optional: Reveal fog-of-war even when the screen is off (based on Explore toggle).
         if UserDefaults.standard.bool(forKey: exploreEnabledKey) {
@@ -385,6 +388,36 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         let t = end.timeIntervalSince(start)
         guard t > 0 else { return 0 }
         return distanceMeters / t
+    }
+
+    private func pruneSessionPoints(now: Date) {
+        if sessionPointTimeWindow > 0 {
+            let cutoff = now.addingTimeInterval(-sessionPointTimeWindow)
+            if let firstIndex = sessionPoints.firstIndex(where: { $0.ts >= cutoff }) {
+                if firstIndex > 0 {
+                    sessionPoints.removeFirst(firstIndex)
+                }
+            } else {
+                sessionPoints.removeAll(keepingCapacity: true)
+            }
+        }
+
+        guard sessionPoints.count > maxSessionPoints else { return }
+        let strideSize = Int(ceil(Double(sessionPoints.count) / Double(maxSessionPoints)))
+        guard strideSize > 1 else {
+            sessionPoints = Array(sessionPoints.suffix(maxSessionPoints))
+            return
+        }
+
+        var downsampled: [JourneyPoint] = []
+        downsampled.reserveCapacity(maxSessionPoints)
+        for index in stride(from: 0, to: sessionPoints.count, by: strideSize) {
+            downsampled.append(sessionPoints[index])
+        }
+        if let last = sessionPoints.last, downsampled.last?.ts != last.ts {
+            downsampled.append(last)
+        }
+        sessionPoints = downsampled
     }
 }
 
@@ -560,4 +593,3 @@ final class ExploreStore: ObservableObject {
         UserDefaults.standard.set(data, forKey: key)
     }
 }
-
