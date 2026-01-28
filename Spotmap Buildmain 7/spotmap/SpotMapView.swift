@@ -521,8 +521,12 @@ private struct SpotMapMapLayer: View {
     @Binding var selection: String?
     @ObservedObject var coordinator: SpotMapCoordinator
     @ObservedObject var fogCloudField: FogCloudField
+    @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
 
     var body: some View {
+        let style = UserLocationStyle.from(rawValue: userLocationStyleRaw)
+        let asset = VehicleAssetsCatalog.shared.asset(for: userLocationAssetId)
         MapReader { proxy in
             GeometryReader { geo in
                 ZStack {
@@ -563,7 +567,9 @@ private struct SpotMapMapLayer: View {
                                 .tag(spot.id.recordName)
                         }
 
-                        UserAnnotation()
+                        UserAnnotation {
+                            UserLocationMarkerView(style: style, asset: asset)
+                        }
                     }
                     .mapStyle(exploreEnabled ? .standard(elevation: .flat) : .standard)
                     .mapControls {
@@ -817,4 +823,3 @@ final class SpotMapCoordinator: ObservableObject {
         }
     }
 }
-
