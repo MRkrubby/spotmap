@@ -156,9 +156,7 @@ final class FriendsStore: ObservableObject {
     func updateMyLastJourney(_ journey: JourneyRecord?) {
         guard let journey else { return }
         // Store compressed points so friends can render your last route
-        let raw = (try? JSONEncoder().encode(journey.decodedPoints())) ?? Data()
-        let zipped = (try? JourneyCompression.compress(raw)) ?? raw
-        me.lastJourneyZlib = zipped
+        me.lastJourneyZlib = JourneySerialization.encode(points: journey.decodedPoints())
         me.updatedAt = Date()
         persistMe()
     }
@@ -339,4 +337,3 @@ private extension CKContainer {
         }
     }
 }
-
