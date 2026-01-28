@@ -22,6 +22,7 @@ struct SpotMapView: View {
     private let fog = FogOfWarStore.shared
     @State private var publishDebouncer = Debouncer()
     @State private var fogDebouncer = Debouncer()
+    @State private var cameraDebouncer = Debouncer()
     @StateObject private var fogCloudField = FogCloudField()
     
     @State private var selection: String? = nil
@@ -336,7 +337,9 @@ struct SpotMapView: View {
                     .onMapCameraChange(frequency: .continuous) { context in
                         vm.mapCenterChanged(to: context.region.center)
                         if exploreEnabled {
-                            scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
+                            cameraDebouncer.schedule(delay: .milliseconds(200)) {
+                                scheduleFogCloudUpdate(proxy: proxy, canvasSize: geo.size)
+                            }
                         }
                     }
                     .onChange(of: selection) { _, newValue in
