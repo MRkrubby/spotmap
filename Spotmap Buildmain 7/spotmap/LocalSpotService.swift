@@ -89,14 +89,15 @@ final class LocalSpotService: SpotService {
         }
 
         func toSpot() -> Spot {
-            Spot(
+            var spot = Spot(
                 id: CKRecord.ID(recordName: recordName),
                 title: title,
                 note: note,
                 location: CLLocation(latitude: lat, longitude: lon),
                 createdAt: createdAt
             )
+            spot.photoData = photoData
+            return spot
         }
     }
 }
-

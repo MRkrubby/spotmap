@@ -137,13 +137,13 @@ final class SpotRepository: ObservableObject {
         defer { isLoading = false }
         let previousSpots = spots
 
-        // Note: Spot initializer doesn't accept photoData; handle image persistence inside the service if needed.
-        let spot = Spot(
+        var spot = Spot(
             id: CKRecord.ID(recordName: LocalSpotService.makeRecordNameIfNeeded(forBackend: backend)),
             title: title,
             note: note,
             location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         )
+        spot.photoData = photoData
 
         do {
             let saved = try await withTimeout(seconds: refreshTimeoutSeconds) {
