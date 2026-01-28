@@ -1,76 +1,7 @@
 import Foundation
-import CoreLocation
 import Combine
-
-/// Location manager used by the app.
-///
-/// Important: Do NOT mark this class `@MainActor`.
-/// CoreLocation delegate callbacks can arrive on a non-main thread and Swift's
-/// actor isolation checks may terminate the app at launch if a `@MainActor`-isolated
-/// delegate is called off the main actor.
-final class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
-
-    @Published var lastLocation: CLLocation?
-    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
-
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        manager.distanceFilter = 50
-        manager.pausesLocationUpdatesAutomatically = true
-    }
-
-    /// Switch between low-power and high-accuracy tracking.
-    ///
-    /// Used by Explore mode so the 20m reveal radius feels responsive.
-    func setHighAccuracy(_ enabled: Bool) {
-        if enabled {
-            manager.desiredAccuracy = kCLLocationAccuracyBest
-            manager.distanceFilter = 8
-        } else {
-            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-            manager.distanceFilter = 50
-        }
-    }
-
-    func requestWhenInUse() {
-        manager.requestWhenInUseAuthorization()
-    }
-
-    func start() {
-        manager.startUpdatingLocation()
-    }
-
-    func stop() {
-        manager.stopUpdatingLocation()
-    }
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.authorizationStatus = status
-            if status == .authorizedAlways || status == .authorizedWhenInUse {
-                self.start()
-            }
-        }
-    }
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        let loc = locations.last
-        DispatchQueue.main.async { [weak self] in
-            self?.lastLocation = loc
-        }
-    }
-
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // Don't crash the app on location errors; just keep the last known location.
-        // You can inspect this in the UI via repo.lastErrorMessage if needed.
-    }
-}
-
+import CoreLocation
+import CloudKit
 
 // MARK: - Friends (Life360-style, CloudKit prototype)
 
@@ -155,7 +86,9 @@ final class FriendsStore: ObservableObject {
     func updateMyLastJourney(_ journey: JourneyRecord?) {
         guard let journey else { return }
         // Store compressed points so friends can render your last route
-        me.lastJourneyZlib = JourneySerialization.encode(points: journey.decodedPoints())
+        let raw = (try? JSONEncoder().encode(journey.decodedPoints())) ?? Data()
+        let zipped = (try? JourneyCompression.compress(raw)) ?? raw
+        me.lastJourneyZlib = zipped
         me.updatedAt = Date()
         persistMe()
     }
@@ -201,7 +134,7 @@ final class FriendsStore: ObservableObject {
             }
             _ = try await db.save(record)
         } catch {
-            setLastError(AppErrorMapper.message(for: error))
+            setLastError(error.localizedDescription)
             disableIfEntitlementOrAccountIssue(error)
         }
     }
@@ -222,13 +155,17 @@ final class FriendsStore: ObservableObject {
                 return
             }
 
-            let recordIDs = codes.map { CKRecord.ID(recordName: "friend-\($0)") }
-            let records = try await fetchFriendRecords(from: db, recordIDs: recordIDs)
-            let loaded = records.map { Self.decode($0) }
+            var loaded: [FriendProfile] = []
+            for code in codes {
+                let rid = CKRecord.ID(recordName: "friend-\(code)")
+                if let record = try? await db.record(for: rid) {
+                    loaded.append(Self.decode(record))
+                }
+            }
             let sorted = loaded.sorted(by: { $0.displayName < $1.displayName })
             setFriends(sorted)
         } catch {
-            setLastError(AppErrorMapper.message(for: error))
+            setLastError(error.localizedDescription)
             disableIfEntitlementOrAccountIssue(error)
         }
     }
@@ -283,32 +220,6 @@ final class FriendsStore: ObservableObject {
         }
     }
 
-    private func fetchFriendRecords(from db: CKDatabase, recordIDs: [CKRecord.ID]) async throws -> [CKRecord] {
-        try await withCheckedThrowingContinuation { continuation in
-            let operation = CKFetchRecordsOperation(recordIDs: recordIDs)
-            let lock = NSLock()
-            var records: [CKRecord] = []
-
-            operation.perRecordResultBlock = { _, result in
-                guard case .success(let record) = result else { return }
-                lock.lock()
-                records.append(record)
-                lock.unlock()
-            }
-
-            operation.fetchRecordsResultBlock = { result in
-                switch result {
-                case .success:
-                    continuation.resume(returning: records)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-
-            db.add(operation)
-        }
-    }
-
     @MainActor
     private func disableIfEntitlementOrAccountIssue(_ error: Error) {
         // If CloudKit isn't configured or the user isn't signed in, keep the app stable
@@ -333,28 +244,5 @@ final class FriendsStore: ObservableObject {
         return FriendProfile(code: code, displayName: name,
                              lastLat: loc?.coordinate.latitude, lastLon: loc?.coordinate.longitude,
                              updatedAt: updatedAt, lastJourneyZlib: data)
-    }
-}
-
-private extension CKDatabase {
-    func record(for id: CKRecord.ID) async throws -> CKRecord {
-        try await withCheckedThrowingContinuation { cont in
-            fetch(withRecordID: id) { record, error in
-                if let error { cont.resume(throwing: error); return }
-                if let record { cont.resume(returning: record); return }
-                cont.resume(throwing: NSError(domain: "FriendProfile", code: -1, userInfo: [NSLocalizedDescriptionKey: "Record not found"]))
-            }
-        }
-    }
-}
-
-private extension CKContainer {
-    func accountStatus() async throws -> CKAccountStatus {
-        try await withCheckedThrowingContinuation { cont in
-            accountStatus { status, error in
-                if let error { cont.resume(throwing: error); return }
-                cont.resume(returning: status)
-            }
-        }
     }
 }
