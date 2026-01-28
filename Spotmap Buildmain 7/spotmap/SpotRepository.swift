@@ -135,6 +135,7 @@ final class SpotRepository: ObservableObject {
         isLoading = true
         lastErrorMessage = nil
         defer { isLoading = false }
+        let previousSpots = spots
 
         // Note: Spot initializer doesn't accept photoData; handle image persistence inside the service if needed.
         let spot = Spot(
@@ -155,6 +156,8 @@ final class SpotRepository: ObservableObject {
         } catch let error as TimeoutError {
             lastErrorMessage = error.localizedDescription
         } catch {
+            spots = previousSpots
+            cache.save(previousSpots)
             lastErrorMessage = humanReadable(error: error)
         }
     }
@@ -192,6 +195,7 @@ final class SpotRepository: ObservableObject {
         isLoading = true
         lastErrorMessage = nil
         defer { isLoading = false }
+        let previousSpots = spots
 
         do {
             try await withTimeout(seconds: refreshTimeoutSeconds) {
@@ -204,6 +208,8 @@ final class SpotRepository: ObservableObject {
         } catch let error as TimeoutError {
             lastErrorMessage = error.localizedDescription
         } catch {
+            spots = previousSpots
+            cache.save(previousSpots)
             lastErrorMessage = humanReadable(error: error)
         }
     }
