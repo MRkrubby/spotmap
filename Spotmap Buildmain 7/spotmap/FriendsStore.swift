@@ -32,6 +32,8 @@ final class FriendsStore: ObservableObject {
 
     private let meKey = "Friends.me.v1"
     private let followingKey = "Friends.following.v1"
+    private let lastJourneyDirectoryName = "Friends"
+    private var lastSavedJourneyZlib: Data? = nil
     private var refreshTask: Task<Void, Never>? = nil
 
     // Lazily created. This avoids touching CloudKit at app launch on setups
@@ -49,6 +51,7 @@ final class FriendsStore: ObservableObject {
             self.me = FriendProfile(code: code, displayName: "Ik", lastLat: nil, lastLon: nil, updatedAt: nil, lastJourneyZlib: nil)
             persistMe()
         }
+        loadLastJourneyZlib()
         loadFollowing()
     }
 
@@ -88,8 +91,10 @@ final class FriendsStore: ObservableObject {
         // Store compressed points so friends can render your last route
         let raw = (try? JSONEncoder().encode(journey.decodedPoints())) ?? Data()
         let zipped = (try? JourneyCompression.compress(raw)) ?? raw
+        guard me.lastJourneyZlib != zipped else { return }
         me.lastJourneyZlib = zipped
         me.updatedAt = Date()
+        persistLastJourneyZlib()
         persistMe()
     }
 
@@ -189,9 +194,39 @@ final class FriendsStore: ObservableObject {
     }
 
     private func persistMe() {
-        if let data = try? JSONEncoder().encode(me) {
+        var snapshot = me
+        snapshot.lastJourneyZlib = nil
+        if let data = try? JSONEncoder().encode(snapshot) {
             UserDefaults.standard.set(data, forKey: meKey)
         }
+    }
+
+    private func loadLastJourneyZlib() {
+        guard let url = lastJourneyURL(for: me.code) else { return }
+        guard let data = try? Data(contentsOf: url) else { return }
+        me.lastJourneyZlib = data
+        lastSavedJourneyZlib = data
+    }
+
+    private func persistLastJourneyZlib() {
+        guard let url = lastJourneyURL(for: me.code) else { return }
+        guard let data = me.lastJourneyZlib else { return }
+        guard data != lastSavedJourneyZlib else { return }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
+            try data.write(to: url, options: [.atomic])
+            lastSavedJourneyZlib = data
+        } catch {
+            // Ignore persistence failures; keep in-memory copy.
+        }
+    }
+
+    private func lastJourneyURL(for code: String) -> URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let directory = base.appendingPathComponent(lastJourneyDirectoryName, isDirectory: true)
+        return directory.appendingPathComponent("last-journey-\(code).zlib")
     }
 
     @MainActor
