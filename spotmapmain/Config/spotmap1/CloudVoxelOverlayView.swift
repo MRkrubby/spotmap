@@ -237,6 +237,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             // Clone to keep per-cloud transforms independent.
             // Flattened clone is cheaper to render than a deep graph.
             let node = proto.flattenedClone()
+            Self.enforceYAxisBillboards(node)
             Self.centerPivot(node)
 
             // Ensure we keep alpha if the model uses it.
@@ -252,6 +253,25 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             }
 
             return node
+        }
+
+        private static func enforceYAxisBillboards(_ node: SCNNode) {
+            if let constraints = node.constraints {
+                for constraint in constraints {
+                    if let billboard = constraint as? SCNBillboardConstraint {
+                        billboard.freeAxes = [.Y]
+                    }
+                }
+            }
+            node.enumerateChildNodes { child, _ in
+                if let constraints = child.constraints {
+                    for constraint in constraints {
+                        if let billboard = constraint as? SCNBillboardConstraint {
+                            billboard.freeAxes = [.Y]
+                        }
+                    }
+                }
+            }
         }
 
         private static func makeFallbackVoxelCloud() -> SCNNode {
