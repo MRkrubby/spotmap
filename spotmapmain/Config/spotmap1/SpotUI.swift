@@ -22,7 +22,7 @@ enum SpotBrand {
 /// press state reliable and keeps all buttons responsive.
 struct SpotCircleButton: View {
     let systemImage: String
-    var accessibilityLabel: String
+    var accessibilityLabel: LocalizedStringKey
     var action: () -> Void
 
     var body: some View {
@@ -36,7 +36,7 @@ struct SpotCircleButton: View {
                 .shadow(radius: 6)
         }
         .buttonStyle(SpotPressScaleStyle())
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(Text(accessibilityLabel))
     }
 }
 
@@ -49,7 +49,7 @@ private struct SpotPressScaleStyle: ButtonStyle {
 }
 
 struct SpotPill: View {
-    let text: String
+    let text: LocalizedStringKey
     var icon: String? = nil
 
     var body: some View {
@@ -90,7 +90,7 @@ struct SpotTopBar: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("SpotMap")
+                        Text("spotui.app_name")
                             .font(.system(size: 17, weight: .bold))
                         Text(backendTitle)
                             .font(.caption2.weight(.semibold))
@@ -100,9 +100,9 @@ struct SpotTopBar: View {
                 Spacer(minLength: 0)
 
                 HStack(spacing: 10) {
-                    SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie", action: onTapLocation)
-                    SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "Lijst", action: onTapList)
-                    SpotCircleButton(systemImage: "gearshape", accessibilityLabel: "Instellingen", action: onTapSettings)
+                    SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "spotui.location_accessibility", action: onTapLocation)
+                    SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "spotui.list_accessibility", action: onTapList)
+                    SpotCircleButton(systemImage: "gearshape", accessibilityLabel: "spotui.settings_accessibility", action: onTapSettings)
                 }
             }
 
@@ -126,7 +126,7 @@ struct SpotSearchBar: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Zoek spot…", text: $text)
+            TextField("spotui.search_placeholder", text: $text)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
 
@@ -151,7 +151,7 @@ struct SpotSearchBar: View {
 // MARK: - Loading
 
 struct SpotLoadingPill: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(spacing: 10) {
@@ -177,13 +177,13 @@ struct SpotBottomBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            SpotPill(text: "\(count) spots", icon: "mappin.and.ellipse")
+            SpotPill(text: "spotui.spot_count \(count)", icon: "mappin.and.ellipse")
             Spacer(minLength: 0)
 
             Button {
                 onRefresh()
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label("spotui.refresh", systemImage: "arrow.clockwise")
                     .font(.caption.weight(.semibold))
                     .padding(.vertical, 8)
                     .padding(.horizontal, 10)
@@ -221,10 +221,10 @@ struct SpotFabMenu: View {
 
     struct Item: Identifiable {
         let id = UUID()
-        let title: String
+        let title: LocalizedStringKey
         let systemImage: String
         let action: () -> Void
-        init(title: String, systemImage: String, action: @escaping () -> Void) {
+        init(title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) {
             self.title = title
             self.systemImage = systemImage
             self.action = action
@@ -251,8 +251,8 @@ struct SpotFabMenu: View {
                         item.action()
                     } label: {
                         HStack(spacing: 10) {
-                            Text(item.title)
-                                .font(.caption.weight(.semibold))
+                    Text(item.title)
+                        .font(.caption.weight(.semibold))
                             Image(systemName: item.systemImage)
                                 .font(.system(size: 14, weight: .semibold))
                                 .frame(width: 30, height: 30)
@@ -288,7 +288,7 @@ struct SpotFabMenu: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isOpen ? "Sluit menu" : "Open menu")
+            .accessibilityLabel(Text(isOpen ? "spotui.menu_close" : "spotui.menu_open"))
         }
     }
 }
@@ -310,7 +310,7 @@ struct HomeHeaderBar: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("SpotMap")
+                    Text("spotui.app_name")
                         .font(.system(size: 16, weight: .bold))
                     Text(backendTitle)
                         .font(.caption2.weight(.semibold))
@@ -321,8 +321,8 @@ struct HomeHeaderBar: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 10) {
-                SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie", action: onTapLocation)
-                SpotCircleButton(systemImage: "gearshape", accessibilityLabel: "Instellingen", action: onTapSettings)
+                SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "spotui.location_accessibility", action: onTapLocation)
+                SpotCircleButton(systemImage: "gearshape", accessibilityLabel: "spotui.settings_accessibility", action: onTapSettings)
             }
         }
         .padding(10)
@@ -374,7 +374,7 @@ struct HomeBottomSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    Text("Zoek bestemming")
+                    Text("spotui.search_destination")
                         .foregroundStyle(.primary)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.triangle.turn.up.right.diamond")
@@ -391,20 +391,20 @@ struct HomeBottomSheet: View {
             // Quick actions (compact chips)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
-                    HomeActionChip(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") { onAddSpot() }
-                    HomeActionChip(title: "Drive", systemImage: "steeringwheel") { onDriveMode() }
-                    HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
-                    HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
+                    HomeActionChip(title: "spotui.action_spots", systemImage: "list.bullet") { onShowSpots() }
+                    HomeActionChip(title: "spotui.action_new_spot", systemImage: "mappin.and.ellipse") { onAddSpot() }
+                    HomeActionChip(title: "spotui.action_drive", systemImage: "steeringwheel") { onDriveMode() }
+                    HomeActionChip(title: "spotui.action_journeys", systemImage: "car") { onOpenJourneys() }
+                    HomeActionChip(title: isRecording ? "spotui.action_stop_ride" : "spotui.action_start_ride",
                                    systemImage: isRecording ? "stop.fill" : "record.circle") {
                         onToggleJourney()
                     }
 
                     Menu {
-                        Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                        Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
+                        Button { onRefresh() } label: { Label("spotui.refresh", systemImage: "arrow.clockwise") }
+                        Button { onOpenSettings() } label: { Label("spotui.settings_accessibility", systemImage: "gearshape") }
                     } label: {
-                        HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                        HomeActionChipLabel(title: "spotui.action_more", systemImage: "ellipsis")
                     }
                 }
                 .padding(.vertical, 2)
@@ -413,13 +413,13 @@ struct HomeBottomSheet: View {
             if expanded {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Dichtbij")
+                        Text("spotui.section_nearby")
                             .font(.subheadline.weight(.bold))
                         Spacer(minLength: 0)
                         Button {
                             onShowSpots()
                         } label: {
-                            Text("Alles")
+                            Text("spotui.section_all")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.plain)
@@ -427,7 +427,7 @@ struct HomeBottomSheet: View {
                     }
 
                     if previewSpots.isEmpty {
-                        Text("Nog geen spots. Maak er één aan of refresh je omgeving.")
+                        Text("spotui.empty_spots")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 6)
@@ -447,13 +447,13 @@ struct HomeBottomSheet: View {
                     Divider().opacity(0.45)
 
                     HStack {
-                        Text("Ritten")
+                        Text("spotui.section_journeys")
                             .font(.subheadline.weight(.bold))
                         Spacer(minLength: 0)
                         Button {
                             onOpenJourneys()
                         } label: {
-                            Text("Alles")
+                            Text("spotui.section_all")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.plain)
@@ -461,7 +461,7 @@ struct HomeBottomSheet: View {
                     }
 
                     if recentJourneys.isEmpty {
-                        Text("Nog geen ritten. Start een rit om te loggen.")
+                        Text("spotui.empty_journeys")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 2)
@@ -478,7 +478,7 @@ struct HomeBottomSheet: View {
 
             // Status row
             HStack(spacing: 10) {
-                Text("\(spotCount) spots")
+                Text("spotui.spot_count \(spotCount)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text("•")
@@ -509,7 +509,7 @@ struct HomeBottomSheet: View {
 }
 
 private struct HomeActionChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let action: () -> Void
 
@@ -522,7 +522,7 @@ private struct HomeActionChip: View {
 }
 
 private struct HomeActionChipLabel: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
 
     var body: some View {
@@ -583,7 +583,7 @@ private struct HomeJourneyRow: View {
                 Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                Text("Duur \(JourneyFormat.duration(record.duration))")
+                Text("spotui.duration \(JourneyFormat.duration(record.duration))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
