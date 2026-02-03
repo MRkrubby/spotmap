@@ -70,7 +70,7 @@
 "settings.location_style" = "Location style";
 "settings.location_icon" = "Your icon";
 "settings.location_style_help" = "Choose a personal car or a vehicle from the asset pack to personalize your location while driving.";
-"settings.no_vehicle_assets" = "No vehicle assets found in VehicleAssets/vehicle_assets.json.";
+"settings.no_vehicle_assets" = "No vehicle assets found in vehicle_assets/ (*.obj).";
 "settings.vehicle_picker" = "Vehicle";
 "settings.backend" = "Backend";
 "settings.backend_storage" = "Save & load";

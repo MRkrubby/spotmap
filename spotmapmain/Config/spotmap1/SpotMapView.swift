@@ -678,7 +678,7 @@ private struct SpotMapMapLayer: View {
     @ObservedObject var coordinator: SpotMapCoordinator
     @ObservedObject var fogCloudField: FogCloudField
     @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
-    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "suv"
 
     var body: some View {
         let style = UserLocationStyle.from(rawValue: userLocationStyleRaw)

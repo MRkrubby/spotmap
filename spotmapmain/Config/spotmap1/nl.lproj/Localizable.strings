@@ -70,7 +70,7 @@
 "settings.location_style" = "Locatie-stijl";
 "settings.location_icon" = "Jouw icoon";
 "settings.location_style_help" = "Kies een persoonlijke auto of een voertuig uit het asset pack om je locatie te personaliseren tijdens het rijden.";
-"settings.no_vehicle_assets" = "Geen vehicle assets gevonden in VehicleAssets/vehicle_assets.json.";
+"settings.no_vehicle_assets" = "Geen vehicle assets gevonden in vehicle_assets/ (*.obj).";
 "settings.vehicle_picker" = "Voertuig";
 "settings.backend" = "Backend";
 "settings.backend_storage" = "Opslaan & laden";
