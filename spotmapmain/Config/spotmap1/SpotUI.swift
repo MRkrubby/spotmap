@@ -400,25 +400,34 @@ struct HomeBottomSheet: View {
             .buttonStyle(.plain)
 
             // Quick actions (compact chips)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
-                    HomeActionChip(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") { onAddSpot() }
-                    HomeActionChip(title: "Drive", systemImage: "steeringwheel") { onDriveMode() }
-                    HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
-                    HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
-                                   systemImage: isRecording ? "stop.fill" : "record.circle") {
-                        onToggleJourney()
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    HomePrimaryButton(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") {
+                        onAddSpot()
                     }
-
-                    Menu {
-                        Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                        Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
-                    } label: {
-                        HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                    HomePrimaryButton(title: "Drive", systemImage: "steeringwheel") {
+                        onDriveMode()
                     }
                 }
-                .padding(.vertical, 2)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
+                        HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
+                        HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
+                                       systemImage: isRecording ? "stop.fill" : "record.circle") {
+                            onToggleJourney()
+                        }
+
+                        Menu {
+                            Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                            Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
+                        } label: {
+                            HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
 
             if expanded {
@@ -534,6 +543,23 @@ private struct HomeActionChip: View {
             HomeActionChipLabel(title: title, systemImage: systemImage)
         }
         .buttonStyle(SpotPressScaleStyle())
+    }
+}
+
+private struct HomePrimaryButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
     }
 }
 
