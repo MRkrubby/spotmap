@@ -2,6 +2,7 @@ import SwiftUI
 import SceneKit
 import UIKit
 import simd
+import os
 
 /// A renderable cloud item in view coordinates.
 ///
@@ -53,6 +54,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
     // MARK: - Coordinator
 
     final class Coordinator {
+        private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "spotmap", category: "CloudVoxelOverlay")
         let scene = SCNScene()
         private let root = SCNNode()
         private let cameraNode = SCNNode()
@@ -230,7 +232,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             if let cached = prototypes[asset] {
                 proto = cached
             } else {
-                proto = loadPrototype(asset: asset) ?? Self.makeFallbackVoxelCloud()
+                proto = loadPrototype(asset: asset)
                 prototypes[asset] = proto
             }
 
@@ -254,65 +256,31 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             return node
         }
 
-        private static func makeFallbackVoxelCloud() -> SCNNode {
-            // Simple low-poly fallback so clouds are never invisible if the USDZ is missing.
-            let container = SCNNode()
-            let mat = SCNMaterial()
-            mat.lightingModel = .physicallyBased
-            mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.95)
-            mat.roughness.contents = 0.9
-            mat.metalness.contents = 0.0
+        private func loadPrototype(asset: CloudAsset) -> SCNNode {
+            let node = AssetBundleResolver.loadSceneNode(
+                assetPath: asset.rawValue,
+                log: log,
+                fallback: .voxelCloud
+            ) { url in
+                // Load USDZ into SceneKit.
+                guard let ref = SCNReferenceNode(url: url) else { return nil }
+                ref.load()
 
-            // Build a small voxel blob out of boxes.
-            let boxes: [(Float, Float, Float, Float)] = [
-                (0, 0, 0, 1.2),
-                (1.1, 0.2, 0.1, 0.95),
-                (-1.0, -0.1, 0.0, 0.9),
-                (0.3, 0.9, 0.0, 0.85),
-                (-0.4, 0.8, -0.1, 0.8),
-                (0.7, -0.8, 0.0, 0.8),
-            ]
-            for (x, y, z, s) in boxes {
-                let g = SCNBox(width: CGFloat(120 * s), height: CGFloat(90 * s), length: CGFloat(90 * s), chamferRadius: 12)
-                g.materials = [mat]
-                let n = SCNNode(geometry: g)
-                n.position = SCNVector3(x * 70, y * 60, z * 40)
-                container.addChildNode(n)
+                // Normalize pivot to its bounding box center so scaling/rotation behaves nicely.
+                let container = SCNNode()
+                container.addChildNode(ref)
+
+                // Center pivot for consistent placement.
+                let (minV, maxV) = container.boundingBox
+                let center = SCNVector3(
+                    (minV.x + maxV.x) * 0.5,
+                    (minV.y + maxV.y) * 0.5,
+                    (minV.z + maxV.z) * 0.5
+                )
+                container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
+                return container
             }
-
-            // Center pivot.
-            let (minV, maxV) = container.boundingBox
-            let center = SCNVector3((minV.x + maxV.x) * 0.5, (minV.y + maxV.y) * 0.5, (minV.z + maxV.z) * 0.5)
-            container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
-            return container
-        }
-
-        private func loadPrototype(asset: CloudAsset) -> SCNNode? {
-            guard let url = AssetBundleResolver.resolveURL(for: asset.rawValue) else {
-                #if DEBUG
-                print("[CloudVoxelOverlayView] Missing USDZ in bundle: \(asset.rawValue)")
-                #endif
-                return nil
-            }
-
-            // Load USDZ into SceneKit.
-            guard let ref = SCNReferenceNode(url: url) else { return nil }
-            ref.load()
-
-            // Normalize pivot to its bounding box center so scaling/rotation behaves nicely.
-            let container = SCNNode()
-            container.addChildNode(ref)
-
-            // Center pivot for consistent placement.
-            let (minV, maxV) = container.boundingBox
-            let center = SCNVector3(
-                (minV.x + maxV.x) * 0.5,
-                (minV.y + maxV.y) * 0.5,
-                (minV.z + maxV.z) * 0.5
-            )
-            container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
-
-            return container
+            return node
         }
 
         // MARK: - Tiny RNG
