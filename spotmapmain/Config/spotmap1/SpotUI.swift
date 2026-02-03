@@ -35,8 +35,11 @@ struct SpotCircleButton: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.12)))
                 .shadow(radius: 6)
         }
+        .padding(4)
+        .contentShape(Circle())
         .buttonStyle(SpotPressScaleStyle())
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -136,8 +139,13 @@ struct SpotSearchBar: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Wis zoekopdracht")
+                .accessibilityAddTraits(.isButton)
             }
         }
         .padding(.vertical, 8)
@@ -287,8 +295,11 @@ struct SpotFabMenu: View {
                         .font(.system(size: 17, weight: .bold))
                 }
             }
+            .padding(4)
+            .contentShape(Circle())
             .buttonStyle(.plain)
             .accessibilityLabel(isOpen ? "Sluit menu" : "Open menu")
+            .accessibilityAddTraits(.isButton)
         }
     }
 }
@@ -496,8 +507,13 @@ struct HomeBottomSheet: View {
                         .font(.caption.weight(.semibold))
                         .frame(width: 32, height: 28)
                 }
+                .padding(6)
+                .contentShape(Rectangle())
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .accessibilityLabel("Vernieuwen")
+                .accessibilityAddTraits(.isButton)
             }
         }
         .padding(12)
