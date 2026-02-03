@@ -7,7 +7,7 @@ import MapKit
 /// A renderable cloud item in world coordinates.
 struct CloudVoxelItem: Identifiable, Hashable {
     let id: UInt64
-    let mapPoint: MKMapPoint
+    let coordinate: CLLocationCoordinate2D
     let sizeMeters: Double
     let altitudeMeters: Double
     let asset: CloudAsset
@@ -42,7 +42,9 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
     func updateUIView(_ scnView: SCNView, context: Context) {
         context.coordinator.update(
             items: items,
-            viewportSize: viewportSize
+            viewportSize: viewportSize,
+            centerCoordinate: centerCoordinate,
+            metersPerPoint: metersPerPoint
         )
     }
 
@@ -105,7 +107,12 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             view.pointOfView = cameraNode
         }
 
-        func update(items: [CloudVoxelItem], viewportSize: CGSize) {
+        func update(
+            items: [CloudVoxelItem],
+            viewportSize: CGSize,
+            centerCoordinate: CLLocationCoordinate2D,
+            metersPerPoint: Double
+        ) {
             // Prevent implicit SceneKit animations when we update transforms.
             // Without this, SceneKit may interpolate Euler angles across wrap boundaries (±π)
             // and you can get an unwanted full 360° spin.
@@ -119,15 +126,16 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             cameraNode.eulerAngles = SCNVector3(0, 0, 0)
             if let cam = cameraNode.camera {
                 cam.usesOrthographicProjection = true
-                cam.orthographicScale = Double(max(200.0, viewportSize.height * 0.5))
+                let viewportHeightMeters = Double(viewportSize.height) * max(0.0001, metersPerPoint)
+                cam.orthographicScale = max(200.0, viewportHeightMeters * 0.5)
             }
 
-            // Move origin to center of view.
-            cloudRoot.position = SCNVector3(-Float(viewportSize.width * 0.5), Float(viewportSize.height * 0.5), 0)
+            // Keep the SceneKit world origin stable; we map map-world deltas into scene units.
+            cloudRoot.position = SCNVector3(0, 0, 0)
 
-            let safeMetersPerPoint = max(0.0001, metersPerPoint)
             let centerMapPoint = MKMapPoint(centerCoordinate)
             let metersPerMapPoint = max(0.0001, MKMetersPerMapPointAtLatitude(centerCoordinate.latitude))
+            let sceneUnitsPerMeter = 1.0
 
             // Remove missing.
             let incoming = Set(items.map { $0.id })
@@ -153,20 +161,17 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                     cloudRoot.addChildNode(node)
                 }
 
-                // Position in "world space" (map coordinates), projected into scene space using meters-per-point.
-                let dxMeters = (item.mapPoint.x - centerMapPoint.x) * metersPerMapPoint
-                let dyMeters = (item.mapPoint.y - centerMapPoint.y) * metersPerMapPoint
-                let screenX = Double(viewportSize.width) * 0.5 + dxMeters / safeMetersPerPoint
-                let screenY = Double(viewportSize.height) * 0.5 + dyMeters / safeMetersPerPoint
-
-                // SceneKit Y axis points up; screen Y points down -> invert by using +y with root offset.
-                let x = Float(screenX)
-                let y = Float(screenY)
+                // Position in map/world space -> SceneKit world space (no screen-space projection).
+                let mapPoint = MKMapPoint(item.coordinate)
+                let dxMeters = (mapPoint.x - centerMapPoint.x) * metersPerMapPoint
+                let dyMeters = (mapPoint.y - centerMapPoint.y) * metersPerMapPoint
+                let x = Float(dxMeters * sceneUnitsPerMeter)
+                let y = Float(dyMeters * sceneUnitsPerMeter)
 
                 // Height: user wants clouds LOWER.
                 // Keep them above buildings when pitched, but not floating too high.
                 // ~200m -> ~45 Scene units.
-                let z = Float(min(24, max(0, item.altitudeMeters * 0.06)))
+                let z = Float(min(24, max(0, item.altitudeMeters * 0.06 * sceneUnitsPerMeter)))
                 node.position = SCNVector3(x, -y, z)
 
                 // Scale: use world size (meters) projected into points.
@@ -178,8 +183,8 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 case .tiny:     scaleBase = 0.74
                 }
                 // Bigger overall scaling (user asked: MUCH larger clouds).
-                let sizePoints = item.sizeMeters / safeMetersPerPoint
-                let s = Float(max(0.10, sizePoints / 340.0)) * scaleBase
+                let sizeUnits = item.sizeMeters * sceneUnitsPerMeter
+                let s = Float(max(0.10, sizeUnits / 340.0)) * scaleBase
                 node.scale = SCNVector3(s, s, s)
 
                 // Orientation: base random yaw only (no camera-driven pitch/roll).
