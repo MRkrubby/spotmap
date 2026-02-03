@@ -62,19 +62,23 @@ struct SpotCircleButton: View {
     let systemImage: String
     var accessibilityLabel: String
     var action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 15
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
                 .background(SpotDesign.Elevation.surfaceMaterial)
                 .clipShape(Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
                 .shadow(radius: SpotDesign.Elevation.shadowLow)
         }
+        .padding(4)
+        .contentShape(Circle())
         .buttonStyle(SpotPressScaleStyle())
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -89,12 +93,13 @@ private struct SpotPressScaleStyle: ButtonStyle {
 struct SpotPill: View {
     let text: String
     var icon: String? = nil
+    @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 12
 
     var body: some View {
         HStack(spacing: SpotDesign.Spacing.md) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
             }
             Text(text)
                 .font(.caption.weight(.semibold))
@@ -129,7 +134,7 @@ struct SpotTopBar: View {
 
                     VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                         Text("SpotMap")
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.headline.weight(.bold))
                         Text(backendTitle)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -174,8 +179,13 @@ struct SpotSearchBar: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Wis zoekopdracht")
+                .accessibilityAddTraits(.isButton)
             }
         }
         .padding(.vertical, SpotDesign.Spacing.md)
@@ -271,6 +281,8 @@ struct SpotFabMenu: View {
 
     @Binding var isOpen: Bool
     private let items: () -> [Item]
+    @ScaledMetric(relativeTo: .caption) private var menuIconSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .headline) private var fabIconSize: CGFloat = 17
 
     init(isOpen: Binding<Bool>, @ItemBuilder items: @escaping () -> [Item]) {
         self._isOpen = isOpen
@@ -292,7 +304,7 @@ struct SpotFabMenu: View {
                             Text(item.title)
                                 .font(.caption.weight(.semibold))
                             Image(systemName: item.systemImage)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: menuIconSize, weight: .semibold))
                                 .frame(width: 30, height: 30)
                                 .background(SpotDesign.Elevation.controlMaterial)
                                 .clipShape(Circle())
@@ -322,11 +334,14 @@ struct SpotFabMenu: View {
                         .shadow(radius: SpotDesign.Elevation.shadowMedium)
 
                     Image(systemName: isOpen ? "xmark" : "plus")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: fabIconSize, weight: .bold))
                 }
             }
+            .padding(4)
+            .contentShape(Circle())
             .buttonStyle(.plain)
             .accessibilityLabel(isOpen ? "Sluit menu" : "Open menu")
+            .accessibilityAddTraits(.isButton)
         }
     }
 }
@@ -349,7 +364,7 @@ struct HomeHeaderBar: View {
 
                 VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxxs) {
                     Text("SpotMap")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                     Text(backendTitle)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -427,25 +442,34 @@ struct HomeBottomSheet: View {
             .buttonStyle(.plain)
 
             // Quick actions (compact chips)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SpotDesign.Spacing.md) {
-                    HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
-                    HomeActionChip(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") { onAddSpot() }
-                    HomeActionChip(title: "Drive", systemImage: "steeringwheel") { onDriveMode() }
-                    HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
-                    HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
-                                   systemImage: isRecording ? "stop.fill" : "record.circle") {
-                        onToggleJourney()
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    HomePrimaryButton(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") {
+                        onAddSpot()
                     }
-
-                    Menu {
-                        Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                        Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
-                    } label: {
-                        HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                    HomePrimaryButton(title: "Drive", systemImage: "steeringwheel") {
+                        onDriveMode()
                     }
                 }
-                .padding(.vertical, SpotDesign.Spacing.xxs)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
+                        HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
+                        HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
+                                       systemImage: isRecording ? "stop.fill" : "record.circle") {
+                            onToggleJourney()
+                        }
+
+                        Menu {
+                            Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                            Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
+                        } label: {
+                            HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
 
             if expanded {
@@ -534,8 +558,13 @@ struct HomeBottomSheet: View {
                         .font(.caption.weight(.semibold))
                         .frame(width: 32, height: 28)
                 }
+                .padding(6)
+                .contentShape(Rectangle())
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .accessibilityLabel("Vernieuwen")
+                .accessibilityAddTraits(.isButton)
             }
         }
         .padding(SpotDesign.Spacing.xl)
@@ -556,6 +585,23 @@ private struct HomeActionChip: View {
             HomeActionChipLabel(title: title, systemImage: systemImage)
         }
         .buttonStyle(SpotPressScaleStyle())
+    }
+}
+
+private struct HomePrimaryButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
     }
 }
 
@@ -586,12 +632,14 @@ private struct HomeSpotRow: View {
                 Text(spot.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 if !spot.note.isEmpty {
                     Text(spot.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
             }
 
@@ -621,10 +669,12 @@ private struct HomeJourneyRow: View {
                 Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text("Duur \(JourneyFormat.duration(record.duration))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
             Spacer(minLength: 0)

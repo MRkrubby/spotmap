@@ -14,6 +14,8 @@ struct HomeBottomOverlay: View {
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var friends: FriendsStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @ObservedObject var repo: SpotRepository
     @ObservedObject private var explore = ExploreStore.shared
@@ -31,8 +33,29 @@ struct HomeBottomOverlay: View {
     @State private var showingSteps = false
     @State private var showingHomeMenu = false
 
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var overlaySpacing: CGFloat {
+        isCompactHeight ? 6 : 10
+    }
+
+    private var cardPadding: CGFloat {
+        isCompactHeight ? 10 : 12
+    }
+
+    private var horizontalInset: CGFloat {
+        if isCompactHeight { return 10 }
+        return isRegularWidth ? 18 : 14
+    }
+
     var body: some View {
-        VStack(spacing: SpotDesign.Spacing.lg) {
+        VStack(spacing: overlaySpacing) {
             if nav.isNavigating {
                 guidanceUI
             } else if nav.isPreviewing {
@@ -104,8 +127,13 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Wis zoekopdracht")
+                .accessibilityAddTraits(.isButton)
             }
 
             if isSearchFocused || !places.query.isEmpty {
@@ -124,15 +152,19 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(.secondary)
-                        .padding(.leading, SpotDesign.Spacing.xxs)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open menu")
+                .accessibilityAddTraits(.isButton)
             }
         }
-        .padding(.vertical, SpotDesign.Spacing.xl)
-        .padding(.horizontal, SpotDesign.Spacing.xxl)
-        .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.input, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.input, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+        .padding(.vertical, isCompactHeight ? 8 : 12)
+        .padding(.horizontal, horizontalInset)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.10)))
     }
 
     private var resultsPanel: some View {
@@ -147,12 +179,14 @@ struct HomeBottomOverlay: View {
                             VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                                 Text(c.title)
                                     .font(.body.weight(.semibold))
-                                    .lineLimit(1)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.85)
                                 if !c.subtitle.isEmpty {
                                     Text(c.subtitle)
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -188,7 +222,7 @@ struct HomeBottomOverlay: View {
                         })
                     }
                 }
-                .padding(SpotDesign.Spacing.xxl)
+                .padding(isCompactHeight ? 10 : 14)
             }
         }
         .background(SpotDesign.Elevation.controlMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous))
@@ -206,10 +240,10 @@ struct HomeBottomOverlay: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, SpotDesign.Spacing.xl)
-            .padding(.horizontal, SpotDesign.Spacing.xxl)
-            .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+            .padding(.vertical, isCompactHeight ? 8 : 12)
+            .padding(.horizontal, horizontalInset)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
         }
         .buttonStyle(.plain)
     }
@@ -254,7 +288,8 @@ struct HomeBottomOverlay: View {
                     }
                     Text(nav.destinationName ?? "Bestemming")
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -273,10 +308,10 @@ struct HomeBottomOverlay: View {
                 cancelSearch()
             }
         }
-        .padding(SpotDesign.Spacing.xl)
-        .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
-        .shadow(radius: SpotDesign.Elevation.shadowHigh)
+        .padding(cardPadding)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
+        .shadow(radius: 12)
     }
 
     private var primaryPreviewDistance: String {
@@ -296,11 +331,12 @@ struct HomeBottomOverlay: View {
     // MARK: - Guidance
 
     private var guidanceUI: some View {
-        VStack(spacing: SpotDesign.Spacing.lg) {
-            VStack(alignment: .leading, spacing: SpotDesign.Spacing.xs) {
+        VStack(spacing: overlaySpacing) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(nav.instruction.isEmpty ? (nav.destinationName ?? "Route") : nav.instruction)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.headline.weight(.bold))
                     .lineLimit(2)
+                    .minimumScaleFactor(0.85)
 
                 if nav.distanceToNextManeuverMeters > 0 {
                     Text("Over \(formatDistance(nav.distanceToNextManeuverMeters))")
@@ -309,9 +345,9 @@ struct HomeBottomOverlay: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(SpotDesign.Spacing.xl)
-            .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+            .padding(cardPadding)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.10)))
 
             HStack(spacing: SpotDesign.Spacing.lg) {
                 VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
@@ -351,10 +387,10 @@ struct HomeBottomOverlay: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(SpotDesign.Spacing.xl)
-            .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
-            .shadow(radius: SpotDesign.Elevation.shadowHigh)
+            .padding(cardPadding)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
+            .shadow(radius: 12)
         }
     }
 
@@ -513,6 +549,11 @@ struct HomeMenuSheet: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .padding(6)
+                    .contentShape(Rectangle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("Vernieuwen")
+                    .accessibilityAddTraits(.isButton)
                 }
             }
             .alert("Vriend toevoegen", isPresented: $showingAddFriend) {
