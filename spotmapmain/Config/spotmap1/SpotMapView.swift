@@ -183,7 +183,8 @@ struct SpotMapView: View {
             .onChange(of: journeys.currentSpeedMps) { _, _ in
                 guard journeys.isRecording else { return }
                 let points = journeys.liveShareJourneyPoints()
-                friends.updateMyLiveJourney(points: points, speedMps: journeys.currentSpeedMps)
+                let cappedPoints = Array(points.suffix(FriendsStore.liveJourneyInputCap))
+                friends.updateMyLiveJourney(points: cappedPoints, speedMps: journeys.currentSpeedMps)
                 publishDebouncer.schedule(delay: .seconds(3)) {
                     Task { await friends.publish() }
                 }

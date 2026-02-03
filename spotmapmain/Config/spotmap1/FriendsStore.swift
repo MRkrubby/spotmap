@@ -156,6 +156,10 @@ final class FriendsStore: ObservableObject {
     @Published var lastFriendAddWarning: String? = nil
 
     static let liveJourneyMaxAge: TimeInterval = 3 * 60
+    static let liveJourneyBufferMaxPoints: Int = 400
+    static let liveJourneyInputCap: Int = 800
+    static let liveJourneyMinDistanceMeters: Double = 10
+    static let liveJourneyMinTimeInterval: TimeInterval = 2
 
     private let meKey = "Friends.me.v1"
     private let followingKey = "Friends.following.v1"
@@ -312,23 +316,36 @@ final class FriendsStore: ObservableObject {
     }
 
     private func pruneLiveJourneyPoints(_ points: [JourneyPoint]) -> [JourneyPoint] {
-        let maxPoints = 300
-        guard points.count > maxPoints else { return points }
-        let strideSize = Int(ceil(Double(points.count) / Double(maxPoints)))
-        guard strideSize > 1 else { return Array(points.suffix(maxPoints)) }
+        let maxPoints = Self.liveJourneyBufferMaxPoints
+        let trimmed = points.suffix(Self.liveJourneyInputCap)
+        guard trimmed.count > 1 else { return Array(trimmed) }
 
-        var downsampled: [JourneyPoint] = []
-        downsampled.reserveCapacity(maxPoints)
-        for index in stride(from: 0, to: points.count, by: strideSize) {
-            downsampled.append(points[index])
+        var filtered: [JourneyPoint] = []
+        filtered.reserveCapacity(min(trimmed.count, maxPoints))
+
+        var lastKept = trimmed.first!
+        filtered.append(lastKept)
+
+        for point in trimmed.dropFirst() {
+            let timeDelta = point.ts.timeIntervalSince(lastKept.ts)
+            let lastLocation = CLLocation(latitude: lastKept.lat, longitude: lastKept.lon)
+            let currentLocation = CLLocation(latitude: point.lat, longitude: point.lon)
+            let distance = lastLocation.distance(from: currentLocation)
+            if distance >= Self.liveJourneyMinDistanceMeters || timeDelta >= Self.liveJourneyMinTimeInterval {
+                filtered.append(point)
+                lastKept = point
+            }
         }
-        if let last = points.last, downsampled.last?.ts != last.ts {
-            downsampled.append(last)
+
+        if let last = trimmed.last, filtered.last?.ts != last.ts {
+            filtered.append(last)
         }
-        if downsampled.count > maxPoints {
-            downsampled = Array(downsampled.suffix(maxPoints))
+
+        if filtered.count > maxPoints {
+            filtered = Array(filtered.suffix(maxPoints))
         }
-        return downsampled
+
+        return filtered
     }
 
     func regenerateMyCode() async -> Bool {
