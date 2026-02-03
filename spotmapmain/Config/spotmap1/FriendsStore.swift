@@ -155,11 +155,7 @@ final class FriendsStore: ObservableObject {
     @Published var lastError: String? = nil
     @Published var lastFriendAddWarning: String? = nil
 
-    static let liveJourneyMaxAge: TimeInterval = 3 * 60
-    static let liveJourneyBufferMaxPoints: Int = 400
-    static let liveJourneyInputCap: Int = 800
-    static let liveJourneyMinDistanceMeters: Double = 10
-    static let liveJourneyMinTimeInterval: TimeInterval = 2
+    static let liveJourneyMaxAge: TimeInterval = 5 * 60
 
     private let meKey = "Friends.me.v1"
     private let followingKey = "Friends.following.v1"
@@ -206,11 +202,17 @@ final class FriendsStore: ObservableObject {
     }
 
     func liveJourneyZlib(for friend: FriendProfile, referenceDate: Date = Date()) -> Data? {
-        guard let updatedAt = friend.updatedAt,
-              referenceDate.timeIntervalSince(updatedAt) <= Self.liveJourneyMaxAge else {
+        guard isLiveJourneyFresh(for: friend, referenceDate: referenceDate) else {
             return nil
         }
         return friend.liveJourneyZlib
+    }
+
+    func isLiveJourneyFresh(for friend: FriendProfile, referenceDate: Date = Date()) -> Bool {
+        guard let updatedAt = friend.updatedAt else {
+            return false
+        }
+        return referenceDate.timeIntervalSince(updatedAt) <= Self.liveJourneyMaxAge
     }
 
     func setDisplayName(_ name: String) {
@@ -228,7 +230,7 @@ final class FriendsStore: ObservableObject {
             lastFriendAddWarning = "Code ongeldig. Gebruik 6-10 tekens (A-Z/0-9)."
             return
         }
-        var set = followingCodes()
+        var set = Set(followingCodes().map { $0.uppercased() })
         if set.contains(c) {
             return
         }
