@@ -8,7 +8,7 @@ import os
 struct FogCloud: Identifiable, Hashable {
     let id: UInt64
     let coordinate: CLLocationCoordinate2D
-    let sizePoints: CGFloat
+    let sizeMeters: Double
     let altitudeMeters: Double
     let asset: CloudAsset
     let seed: UInt64
@@ -130,7 +130,6 @@ final class FogCloudField: ObservableObject {
                 }
 
                 let sizeMeters = cloudSizeMetersMin + (cloudSizeMetersMax - cloudSizeMetersMin) * rng.nextDouble()
-                let sizePoints = CGFloat(sizeMeters / max(0.0001, metersPerPointNow))
 
                 let altitude = cloudAltitudeMin + (cloudAltitudeMax - cloudAltitudeMin) * rng.nextDouble()
                 let asset = chooseAsset(seed: seed)
@@ -138,7 +137,7 @@ final class FogCloudField: ObservableObject {
                 out.append(FogCloud(
                     id: seed,
                     coordinate: mp.coordinate,
-                    sizePoints: sizePoints,
+                    sizeMeters: sizeMeters,
                     altitudeMeters: altitude,
                     asset: asset,
                     seed: seed

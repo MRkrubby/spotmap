@@ -1,6 +1,6 @@
 # Created by Kenney (www.kenney.nl)
 
-mtllib hatchback-sports.mtl
+mtllib vehicle_shared.mtl
 
 g wheel-front-right
 

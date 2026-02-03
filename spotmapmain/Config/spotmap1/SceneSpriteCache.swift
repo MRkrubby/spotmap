@@ -68,10 +68,15 @@ final class SceneSpriteCache {
             // Deterministic pose per variant.
             var rng = SplitMix64(seed: UInt64(variant) &* 0x9E3779B97F4A7C15)
             let s = Float(0.92 + 0.22 * rng.nextDouble())
-            let rot = Float(rng.nextDouble() * Double.pi * 2.0)
             let lift = Float(0.04 + 0.10 * rng.nextDouble())
             node.scale = SCNVector3(s, s, s)
-            node.eulerAngles = SCNVector3(0, rot, 0)
+            if let yaw = CloudOrientationPolicy.current.yawRadians(seed: UInt64(variant)) {
+                node.eulerAngles = SCNVector3(0, yaw, 0)
+            } else {
+                let billboard = SCNBillboardConstraint()
+                billboard.freeAxes = [.Y]
+                node.constraints = (node.constraints ?? []) + [billboard]
+            }
             node.position = SCNVector3(0, lift, 0)
         }
     }
@@ -145,7 +150,7 @@ final class SceneSpriteCache {
         lights(root)
 
         // Load model prototype and clone it.
-        let proto = loadPrototype(assetPath: assetPath)
+        let proto = loadPrototype(assetPath: assetPath, kind: kind)
         let model = proto.clone()
         normalizePivot(model)
         pose(model)
@@ -178,70 +183,45 @@ final class SceneSpriteCache {
         return image
     }
 
-    private func loadPrototype(assetPath: String) -> SCNNode {
+    private func loadPrototype(assetPath: String, kind: Kind) -> SCNNode {
         lock.lock(); defer { lock.unlock() }
         if let p = modelProto[assetPath] { return p }
 
-        let url = resolveBundleURL(assetPath: assetPath)
-        let node: SCNNode
-
-        if let url {
+        let fallback: AssetBundleResolver.FallbackNode = kind == .cloud ? .voxelCloud : .empty
+        let node = AssetBundleResolver.loadSceneNode(
+            assetPath: assetPath,
+            log: log,
+            fallback: fallback
+        ) { url in
             // Prefer ModelIO for USDZ: it tends to preserve materials and gives stable bounds.
             let mdlAsset = MDLAsset(url: url)
             let scene = SCNScene(mdlAsset: mdlAsset)
             // Flatten so bounding boxes/pivots are reliable for sprite framing.
-            node = scene.rootNode.flattenedClone()
-        } else {
-            node = SCNNode()
+            return scene.rootNode.flattenedClone()
         }
 
+        Self.enforceYAxisBillboards(node)
         modelProto[assetPath] = node
         return node
     }
 
-private func resolveBundleURL(assetPath: String) -> URL? {
-        // Support "CloudAssets/Foo.usdz" style paths reliably.
-        // Important: depending on how Xcode copies resources, the file may end up
-        // either inside its subdirectory **or** flattened at the bundle root.
-        // We therefore try subdirectory lookup first, then fall back to the root.
-
-        // 1) Subdirectory-aware lookup (preferred).
-        if assetPath.contains("/") {
-            let parts = assetPath.split(separator: "/")
-            if parts.count >= 2 {
-                let subdir = parts.dropLast().joined(separator: "/")
-                let filename = String(parts.last!)
-                let name = (filename as NSString).deletingPathExtension
-                let ext = (filename as NSString).pathExtension
-
-                if let url = Bundle.main.url(forResource: name, withExtension: ext.isEmpty ? nil : ext, subdirectory: subdir) {
-                    return url
+    private static func enforceYAxisBillboards(_ node: SCNNode) {
+        if let constraints = node.constraints {
+            for constraint in constraints {
+                if let billboard = constraint as? SCNBillboardConstraint {
+                    billboard.freeAxes = [.Y]
                 }
-
-                // 2) Fallback: flattened copy (common when files are added as individual resources).
-                if let url = Bundle.main.url(forResource: name, withExtension: ext.isEmpty ? nil : ext) {
-                    return url
-                }
-
-                // 3) Last resort: try the full filename as a single resource name.
-                if let url = Bundle.main.url(forResource: filename, withExtension: nil) {
-                    return url
-                }
-
-                log.error("Missing asset in bundle: \(assetPath, privacy: .public)")
-                return nil
             }
         }
-
-        // Non-subdirectory path.
-        let name = (assetPath as NSString).deletingPathExtension
-        let ext = (assetPath as NSString).pathExtension
-        if let url = Bundle.main.url(forResource: name, withExtension: ext.isEmpty ? nil : ext) {
-            return url
+        node.enumerateChildNodes { child, _ in
+            if let constraints = child.constraints {
+                for constraint in constraints {
+                    if let billboard = constraint as? SCNBillboardConstraint {
+                        billboard.freeAxes = [.Y]
+                    }
+                }
+            }
         }
-
-        log.error("Missing asset in bundle: \(assetPath, privacy: .public)")
-        return nil
     }
 
     private func normalizePivot(_ node: SCNNode) {

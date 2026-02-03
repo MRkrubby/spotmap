@@ -13,6 +13,44 @@ enum SpotBrand {
     static let iconSize: CGFloat = 15
 }
 
+// MARK: - Design tokens
+
+enum SpotDesign {
+    enum Spacing {
+        static let none: CGFloat = 0
+        static let xxxs: CGFloat = 1
+        static let xxs: CGFloat = 2
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 6
+        static let md: CGFloat = 8
+        static let lg: CGFloat = 10
+        static let xl: CGFloat = 12
+        static let xxl: CGFloat = 14
+    }
+
+    enum CornerRadius {
+        static let control: CGFloat = 14
+        static let card: CGFloat = 16
+        static let pill: CGFloat = 18
+        static let input: CGFloat = 20
+        static let panel: CGFloat = 22
+        static let sheet: CGFloat = 24
+        static let overlay: CGFloat = 26
+    }
+
+    enum Elevation {
+        static let surfaceMaterial: Material = .ultraThinMaterial
+        static let controlMaterial: Material = .thinMaterial
+        static let outlineStrongOpacity: Double = 0.12
+        static let outlineSoftOpacity: Double = 0.10
+
+        static let shadowLow: CGFloat = 6
+        static let shadowMedium: CGFloat = 8
+        static let shadowPanel: CGFloat = 10
+        static let shadowHigh: CGFloat = 12
+    }
+}
+
 // MARK: - Buttons
 
 /// Small circular icon button used throughout the app.
@@ -22,21 +60,25 @@ enum SpotBrand {
 /// press state reliable and keeps all buttons responsive.
 struct SpotCircleButton: View {
     let systemImage: String
-    var accessibilityLabel: String
+    var accessibilityLabel: LocalizedStringKey
     var action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 15
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
-                .background(.ultraThinMaterial)
+                .background(SpotDesign.Elevation.surfaceMaterial)
                 .clipShape(Circle())
-                .overlay(Circle().strokeBorder(.white.opacity(0.12)))
-                .shadow(radius: 6)
+                .overlay(Circle().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+                .shadow(radius: SpotDesign.Elevation.shadowLow)
         }
+        .padding(4)
+        .contentShape(Circle())
         .buttonStyle(SpotPressScaleStyle())
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -49,24 +91,25 @@ private struct SpotPressScaleStyle: ButtonStyle {
 }
 
 struct SpotPill: View {
-    let text: String
+    let text: LocalizedStringKey
     var icon: String? = nil
+    @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 12
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SpotDesign.Spacing.md) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
             }
             Text(text)
                 .font(.caption.weight(.semibold))
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(.ultraThinMaterial)
+        .padding(.vertical, SpotDesign.Spacing.sm)
+        .padding(.horizontal, SpotDesign.Spacing.lg)
+        .background(SpotDesign.Elevation.surfaceMaterial)
         .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 6)
+        .overlay(Capsule().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowLow)
     }
 }
 
@@ -80,18 +123,18 @@ struct SpotTopBar: View {
     let onTapSettings: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                HStack(spacing: 10) {
+        VStack(spacing: SpotDesign.Spacing.lg) {
+            HStack(spacing: SpotDesign.Spacing.xl) {
+                HStack(spacing: SpotDesign.Spacing.lg) {
                     Image("Logo")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 24, height: 24)
                         .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                         Text("SpotMap")
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.headline.weight(.bold))
                         Text(backendTitle)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -99,7 +142,7 @@ struct SpotTopBar: View {
                 }
                 Spacer(minLength: 0)
 
-                HStack(spacing: 10) {
+                HStack(spacing: SpotDesign.Spacing.lg) {
                     SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie", action: onTapLocation)
                     SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "Lijst", action: onTapList)
                     SpotCircleButton(systemImage: "gearshape", accessibilityLabel: "Instellingen", action: onTapSettings)
@@ -108,11 +151,11 @@ struct SpotTopBar: View {
 
             SpotSearchBar(text: $searchText)
         }
-        .padding(10)
-        .background(.ultraThinMaterial)
+        .padding(SpotDesign.Spacing.lg)
+        .background(SpotDesign.Elevation.surfaceMaterial)
         .clipShape(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 8)
+        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowMedium)
     }
 }
 
@@ -122,11 +165,11 @@ struct SpotSearchBar: View {
     @Binding var text: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Zoek spot…", text: $text)
+            TextField("spotui.search_placeholder", text: $text)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
 
@@ -136,35 +179,40 @@ struct SpotSearchBar: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Wis zoekopdracht")
+                .accessibilityAddTraits(.isButton)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.10)))
+        .padding(.vertical, SpotDesign.Spacing.md)
+        .padding(.horizontal, SpotDesign.Spacing.lg)
+        .background(SpotDesign.Elevation.controlMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.control, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
     }
 }
 
 // MARK: - Loading
 
 struct SpotLoadingPill: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             ProgressView()
             Text(text)
                 .font(.caption.weight(.semibold))
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(.ultraThinMaterial)
+        .padding(.vertical, SpotDesign.Spacing.md)
+        .padding(.horizontal, SpotDesign.Spacing.xl)
+        .background(SpotDesign.Elevation.surfaceMaterial)
         .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 6)
+        .overlay(Capsule().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowLow)
     }
 }
 
@@ -176,29 +224,29 @@ struct SpotBottomBar: View {
     let onRefresh: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             SpotPill(text: "\(count) spots", icon: "mappin.and.ellipse")
             Spacer(minLength: 0)
 
             Button {
                 onRefresh()
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label("spotui.refresh", systemImage: "arrow.clockwise")
                     .font(.caption.weight(.semibold))
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 10)
-                    .background(.ultraThinMaterial)
+                    .padding(.vertical, SpotDesign.Spacing.md)
+                    .padding(.horizontal, SpotDesign.Spacing.lg)
+                    .background(SpotDesign.Elevation.surfaceMaterial)
                     .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
+                    .overlay(Capsule().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
             }
             .buttonStyle(.plain)
             .controlSize(.small)
         }
-        .padding(10)
-        .background(.ultraThinMaterial)
+        .padding(SpotDesign.Spacing.lg)
+        .background(SpotDesign.Elevation.surfaceMaterial)
         .clipShape(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 8)
+        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowMedium)
     }
 }
 
@@ -221,10 +269,10 @@ struct SpotFabMenu: View {
 
     struct Item: Identifiable {
         let id = UUID()
-        let title: String
+        let title: LocalizedStringKey
         let systemImage: String
         let action: () -> Void
-        init(title: String, systemImage: String, action: @escaping () -> Void) {
+        init(title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) {
             self.title = title
             self.systemImage = systemImage
             self.action = action
@@ -233,6 +281,8 @@ struct SpotFabMenu: View {
 
     @Binding var isOpen: Bool
     private let items: () -> [Item]
+    @ScaledMetric(relativeTo: .caption) private var menuIconSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .headline) private var fabIconSize: CGFloat = 17
 
     init(isOpen: Binding<Bool>, @ItemBuilder items: @escaping () -> [Item]) {
         self._isOpen = isOpen
@@ -240,7 +290,7 @@ struct SpotFabMenu: View {
     }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 12) {
+        VStack(alignment: .trailing, spacing: SpotDesign.Spacing.xl) {
             if isOpen {
                 ForEach(items()) { item in
                     Button {
@@ -250,21 +300,21 @@ struct SpotFabMenu: View {
                         }
                         item.action()
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: SpotDesign.Spacing.lg) {
                             Text(item.title)
                                 .font(.caption.weight(.semibold))
                             Image(systemName: item.systemImage)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: menuIconSize, weight: .semibold))
                                 .frame(width: 30, height: 30)
-                                .background(.thinMaterial)
+                                .background(SpotDesign.Elevation.controlMaterial)
                                 .clipShape(Circle())
-                                .overlay(Circle().strokeBorder(.white.opacity(0.10)))
+                                .overlay(Circle().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
                         }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 10)
-                        .background(.ultraThinMaterial)
+                        .padding(.vertical, SpotDesign.Spacing.md)
+                        .padding(.horizontal, SpotDesign.Spacing.lg)
+                        .background(SpotDesign.Elevation.surfaceMaterial)
                         .clipShape(Capsule())
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
                     }
                     .buttonStyle(.plain)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -278,17 +328,20 @@ struct SpotFabMenu: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Circle().strokeBorder(.white.opacity(0.12)))
+                        .fill(SpotDesign.Elevation.surfaceMaterial)
+                        .overlay(Circle().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
                         .frame(width: SpotBrand.fabSize, height: SpotBrand.fabSize)
-                        .shadow(radius: 8)
+                        .shadow(radius: SpotDesign.Elevation.shadowMedium)
 
                     Image(systemName: isOpen ? "xmark" : "plus")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: fabIconSize, weight: .bold))
                 }
             }
+            .padding(4)
+            .contentShape(Circle())
             .buttonStyle(.plain)
             .accessibilityLabel(isOpen ? "Sluit menu" : "Open menu")
+            .accessibilityAddTraits(.isButton)
         }
     }
 }
@@ -301,17 +354,17 @@ struct HomeHeaderBar: View {
     let onTapSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.xl) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
                 Image("Logo")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 22, height: 22)
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxxs) {
                     Text("SpotMap")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                     Text(backendTitle)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -320,16 +373,16 @@ struct HomeHeaderBar: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 10) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
                 SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie", action: onTapLocation)
                 SpotCircleButton(systemImage: "gearshape", accessibilityLabel: "Instellingen", action: onTapSettings)
             }
         }
-        .padding(10)
-        .background(.ultraThinMaterial)
+        .padding(SpotDesign.Spacing.lg)
+        .background(SpotDesign.Elevation.surfaceMaterial)
         .clipShape(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 8)
+        .overlay(RoundedRectangle(cornerRadius: SpotBrand.corner, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowMedium)
     }
 }
 
@@ -355,12 +408,12 @@ struct HomeBottomSheet: View {
     @State private var expanded = true
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: SpotDesign.Spacing.lg) {
             // Handle
             Capsule()
                 .fill(.secondary.opacity(0.5))
                 .frame(width: 44, height: 5)
-                .padding(.top, 6)
+                .padding(.top, SpotDesign.Spacing.sm)
                 .onTapGesture {
                     withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) {
                         expanded.toggle()
@@ -371,55 +424,64 @@ struct HomeBottomSheet: View {
             Button {
                 onNavigate()
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: SpotDesign.Spacing.lg) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    Text("Zoek bestemming")
+                    Text("spotui.search_destination")
                         .foregroundStyle(.primary)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.triangle.turn.up.right.diamond")
                         .foregroundStyle(.secondary)
                 }
                 .font(.subheadline.weight(.semibold))
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.10)))
+                .padding(.vertical, SpotDesign.Spacing.lg)
+                .padding(.horizontal, SpotDesign.Spacing.xl)
+                .background(SpotDesign.Elevation.controlMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.card, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.card, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
             }
             .buttonStyle(.plain)
 
             // Quick actions (compact chips)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
-                    HomeActionChip(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") { onAddSpot() }
-                    HomeActionChip(title: "Drive", systemImage: "steeringwheel") { onDriveMode() }
-                    HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
-                    HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
-                                   systemImage: isRecording ? "stop.fill" : "record.circle") {
-                        onToggleJourney()
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    HomePrimaryButton(title: "Nieuwe spot", systemImage: "mappin.and.ellipse") {
+                        onAddSpot()
                     }
-
-                    Menu {
-                        Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                        Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
-                    } label: {
-                        HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                    HomePrimaryButton(title: "Drive", systemImage: "steeringwheel") {
+                        onDriveMode()
                     }
                 }
-                .padding(.vertical, 2)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        HomeActionChip(title: "Spots", systemImage: "list.bullet") { onShowSpots() }
+                        HomeActionChip(title: "Ritten", systemImage: "car") { onOpenJourneys() }
+                        HomeActionChip(title: isRecording ? "Stop rit" : "Start rit",
+                                       systemImage: isRecording ? "stop.fill" : "record.circle") {
+                            onToggleJourney()
+                        }
+
+                        Menu {
+                            Button { onRefresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                            Button { onOpenSettings() } label: { Label("Instellingen", systemImage: "gearshape") }
+                        } label: {
+                            HomeActionChipLabel(title: "Meer", systemImage: "ellipsis")
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
 
             if expanded {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.md) {
                     HStack {
-                        Text("Dichtbij")
+                        Text("spotui.section_nearby")
                             .font(.subheadline.weight(.bold))
                         Spacer(minLength: 0)
                         Button {
                             onShowSpots()
                         } label: {
-                            Text("Alles")
+                            Text("spotui.section_all")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.plain)
@@ -427,12 +489,12 @@ struct HomeBottomSheet: View {
                     }
 
                     if previewSpots.isEmpty {
-                        Text("Nog geen spots. Maak er één aan of refresh je omgeving.")
+                        Text("spotui.empty_spots")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                            .padding(.vertical, 6)
+                            .padding(.vertical, SpotDesign.Spacing.sm)
                     } else {
-                        VStack(spacing: 6) {
+                        VStack(spacing: SpotDesign.Spacing.sm) {
                             ForEach(previewSpots) { spot in
                                 Button {
                                     onSelectSpot(spot)
@@ -447,13 +509,13 @@ struct HomeBottomSheet: View {
                     Divider().opacity(0.45)
 
                     HStack {
-                        Text("Ritten")
+                        Text("spotui.section_journeys")
                             .font(.subheadline.weight(.bold))
                         Spacer(minLength: 0)
                         Button {
                             onOpenJourneys()
                         } label: {
-                            Text("Alles")
+                            Text("spotui.section_all")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.plain)
@@ -461,12 +523,12 @@ struct HomeBottomSheet: View {
                     }
 
                     if recentJourneys.isEmpty {
-                        Text("Nog geen ritten. Start een rit om te loggen.")
+                        Text("spotui.empty_journeys")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, SpotDesign.Spacing.xxs)
                     } else {
-                        VStack(spacing: 6) {
+                        VStack(spacing: SpotDesign.Spacing.sm) {
                             ForEach(recentJourneys.prefix(2)) { r in
                                 HomeJourneyRow(record: r)
                             }
@@ -477,7 +539,7 @@ struct HomeBottomSheet: View {
             }
 
             // Status row
-            HStack(spacing: 10) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
                 Text("\(spotCount) spots")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -496,20 +558,25 @@ struct HomeBottomSheet: View {
                         .font(.caption.weight(.semibold))
                         .frame(width: 32, height: 28)
                 }
+                .padding(6)
+                .contentShape(Rectangle())
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .accessibilityLabel("Vernieuwen")
+                .accessibilityAddTraits(.isButton)
             }
         }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.white.opacity(0.12)))
-        .shadow(radius: 12)
+        .padding(SpotDesign.Spacing.xl)
+        .background(SpotDesign.Elevation.surfaceMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.sheet, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.sheet, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineStrongOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowHigh)
     }
 }
 
 private struct HomeActionChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let action: () -> Void
 
@@ -521,17 +588,34 @@ private struct HomeActionChip: View {
     }
 }
 
-private struct HomeActionChipLabel: View {
+private struct HomePrimaryButton: View {
     let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+    }
+}
+
+private struct HomeActionChipLabel: View {
+    let title: LocalizedStringKey
     let systemImage: String
 
     var body: some View {
         Label(title, systemImage: systemImage)
             .font(.caption.weight(.semibold))
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
-            .background(.thinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(.white.opacity(0.10)))
+            .padding(.vertical, SpotDesign.Spacing.md)
+            .padding(.horizontal, SpotDesign.Spacing.lg)
+            .background(SpotDesign.Elevation.controlMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
     }
 }
 
@@ -539,21 +623,23 @@ private struct HomeSpotRow: View {
     let spot: Spot
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             Image(systemName: "mappin.and.ellipse")
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 20)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                 Text(spot.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 if !spot.note.isEmpty {
                     Text(spot.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
             }
 
@@ -563,10 +649,10 @@ private struct HomeSpotRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.10)))
+        .padding(.vertical, SpotDesign.Spacing.lg)
+        .padding(.horizontal, SpotDesign.Spacing.xl)
+        .background(SpotDesign.Elevation.controlMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.card, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
     }
 }
 
@@ -574,19 +660,21 @@ private struct HomeJourneyRow: View {
     let record: JourneyRecord
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             Image(systemName: "car")
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 20)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                 Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text("Duur \(JourneyFormat.duration(record.duration))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
             Spacer(minLength: 0)
@@ -595,9 +683,9 @@ private struct HomeJourneyRow: View {
                 .font(.subheadline.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.10)))
+        .padding(.vertical, SpotDesign.Spacing.lg)
+        .padding(.horizontal, SpotDesign.Spacing.xl)
+        .background(SpotDesign.Elevation.controlMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.card, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
     }
 }

@@ -19,40 +19,40 @@ struct SettingsView: View {
         let vehicleAssets = VehicleAssetsCatalog.shared.assets
         NavigationStack {
             Form {
-                Section("Tracking") {
+                Section("settings.tracking") {
                     Toggle(
-                        "Automatisch routes bijhouden (ook scherm uit)",
+                        "settings.tracking_toggle",
                         isOn: Binding(
                             get: { journeys.trackingEnabled },
                             set: { journeys.setTrackingEnabled($0) }
                         )
                     )
-                    Text("Voor tracking met scherm uit heeft iOS meestal 'Altijd' locatie-toestemming nodig. SpotMap vraagt dit automatisch zodra je tracking aanzet.")
+                    Text("settings.tracking_help")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    Button("Vraag locatie-toestemming opnieuw") {
+                    Button("settings.request_location_permission") {
                         journeys.requestPermissionsIfNeeded()
                     }
                 }
 
-                Section("Locatie-stijl") {
-                    Picker("Jouw icoon", selection: $userLocationStyleRaw) {
+                Section("settings.location_style") {
+                    Picker("settings.location_icon", selection: $userLocationStyleRaw) {
                         ForEach(UserLocationStyle.allCases) { style in
                             Text(style.displayName).tag(style.rawValue)
                         }
                     }
-                    Text("Kies een persoonlijke auto of een voertuig uit het asset pack om je locatie te personaliseren tijdens het rijden.")
+                    Text("settings.location_style_help")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
                     if UserLocationStyle.from(rawValue: userLocationStyleRaw) == .assetPack {
                         if vehicleAssets.isEmpty {
-                            Text("Geen vehicle assets gevonden in VehicleAssets/vehicle_assets.json.")
+                            Text("settings.no_vehicle_assets")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         } else {
-                            Picker("Voertuig", selection: $userLocationAssetId) {
+                            Picker("settings.vehicle_picker", selection: $userLocationAssetId) {
                                 ForEach(vehicleAssets) { asset in
                                     Text(asset.displayName).tag(asset.id)
                                 }
@@ -61,8 +61,8 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Backend") {
-                    Picker("Opslaan & laden", selection: Binding(
+                Section("settings.backend") {
+                    Picker("settings.backend_storage", selection: Binding(
                         get: { repo.backend },
                         set: { newValue in
                             let c = currentCenter()
@@ -75,56 +75,52 @@ struct SettingsView: View {
                     }
 
                     if repo.backend == .cloudKit {
-                        Text("CloudKit vereist iCloud login én CloudKit-capability in Xcode. Als dit niet is ingesteld, werkt de app alsnog, maar valt terug op cache/lokaal.")
+                        Text("settings.cloudkit_help")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 
-                        Button("Hoe zet ik CloudKit aan?") {
+                        Button("settings.cloudkit_button") {
                             showingCloudKitHelp = true
                         }
                     }
                 }
 
-                
+                Section("settings.explore") {
+                    Toggle("settings.explore_toggle", isOn: $exploreEnabled)
+                    Text("settings.explore_help")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
 
-Section("Explore") {
-    Toggle("Explore-modus (fog-of-war)", isOn: $exploreEnabled)
-    Text("In Explore-modus is de kaart bedekt met wolken. Door te rijden speel je de omgeving vrij (±20m rondom je route).")
-        .font(.footnote)
-        .foregroundStyle(.secondary)
+                    Button("settings.explore_reset") {
+                        FogOfWarStore.shared.reset()
+                    }
+                }
 
-    Button("Reset Explore kaart") {
-        FogOfWarStore.shared.reset()
-    }
-}
+                Section("settings.friends") {
+                    Toggle("settings.friends_toggle", isOn: $friendsEnabled)
+                    TextField("settings.friends_name", text: $friendsDisplayName)
+                        .textInputAutocapitalization(.words)
 
-Section("Vrienden") {
-    Toggle("Vrienden delen (prototype)", isOn: $friendsEnabled)
-    TextField("Jouw naam", text: $friendsDisplayName)
-        .textInputAutocapitalization(.words)
-
-    Text("Deel je code via WhatsApp/DM. Let op: dit is een CloudKit-prototype (werkt alleen als iCloud/CloudKit beschikbaar is).")
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-}
-Section("Tips") {
-                    Text("• Pannen/zoomen refreshen we alleen op het einde om de app snel te houden.\n• Bij trage iCloud of geen internet wordt na ~10s automatisch gestopt met laden.")
+                    Text("settings.friends_help")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Section("settings.tips") {
+                    Text("settings.tips_text")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Instellingen")
+            .navigationTitle("settings.title")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Sluit") { dismiss() }
+                    Button("settings.close") { dismiss() }
                 }
             }
-            .alert("CloudKit inschakelen", isPresented: $showingCloudKitHelp) {
-                Button("OK", role: .cancel) {}
+            .alert("settings.cloudkit_alert_title", isPresented: $showingCloudKitHelp) {
+                Button("settings.ok", role: .cancel) {}
             } message: {
-                Text(
-                    "In Xcode: klik je target → Signing & Capabilities → + Capability → iCloud.\nVink 'CloudKit' aan en selecteer/maak een container.\nZorg ook dat je bent ingelogd in iCloud op je iPhone."
-                )
+                Text("settings.cloudkit_alert_message")
             }
         }
     }
