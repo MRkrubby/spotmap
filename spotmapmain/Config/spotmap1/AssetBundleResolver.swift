@@ -10,7 +10,9 @@ struct AssetBundleResolver {
     }
 
     static func resolveURL(for assetPath: String, bundle: Bundle = .main, log: Logger? = nil) -> URL? {
-        let (subdir, filename, name, ext) = parse(assetPath: assetPath)
+        guard let (subdir, filename, name, ext) = parse(assetPath: assetPath, log: log) else {
+            return nil
+        }
         let extValue: String? = ext.isEmpty ? nil : ext
 
         if let subdir, let url = bundle.url(forResource: name, withExtension: extValue, subdirectory: subdir) {
@@ -58,9 +60,13 @@ struct AssetBundleResolver {
         }
     }
 
-    private static func parse(assetPath: String) -> (subdir: String?, filename: String, name: String, ext: String) {
+    private static func parse(assetPath: String, log: Logger?) -> (subdir: String?, filename: String, name: String, ext: String)? {
         let parts = assetPath.split(separator: "/")
-        let filename = String(parts.last ?? "")
+        guard let filenamePart = parts.last else {
+            log?.error("Asset path missing filename: \(assetPath, privacy: .public)")
+            return nil
+        }
+        let filename = String(filenamePart)
         let name = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
 
