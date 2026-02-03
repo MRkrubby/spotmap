@@ -13,7 +13,7 @@ struct SettingsView: View {
     @AppStorage("Friends.enabled") private var friendsEnabled: Bool = true
     @AppStorage("Friends.displayName") private var friendsDisplayName: String = "Ik"
     @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
-    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "suv"
 
     var body: some View {
         let vehicleAssets = VehicleAssetsCatalog.shared.assets
