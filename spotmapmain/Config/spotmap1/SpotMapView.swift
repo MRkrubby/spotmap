@@ -144,8 +144,32 @@ struct SpotMapView: View {
             }
             .onChange(of: journeys.journeys) { _, newValue in
                 friends.updateMyLastJourney(newValue.first)
+                let totalKm = ExploreStore.shared.totalDistanceKm(from: newValue)
+                let level = ExploreStore.shared.level(for: totalKm)
+                friends.updateMyStats(
+                    totalDistanceKm: totalKm,
+                    level: level,
+                    visitedCitiesCount: ExploreStore.shared.visitedCities.count,
+                    visitedTilesCount: ExploreStore.shared.visitedTiles.count
+                )
                 publishDebouncer.schedule(delay: .seconds(2)) {
                     Task { await friends.publish() }
+                }
+            }
+            .onChange(of: journeys.currentSpeedMps) { _, _ in
+                guard journeys.isRecording else { return }
+                let points = journeys.sessionPolyline()
+                friends.updateMyLiveJourney(points: points, speedMps: journeys.currentSpeedMps)
+                publishDebouncer.schedule(delay: .seconds(3)) {
+                    Task { await friends.publish() }
+                }
+            }
+            .onChange(of: journeys.isRecording) { _, isRecording in
+                if !isRecording {
+                    friends.clearLiveJourney()
+                    publishDebouncer.schedule(delay: .seconds(2)) {
+                        Task { await friends.publish() }
+                    }
                 }
             }
             .onAppear {
@@ -235,6 +259,7 @@ struct SpotMapView: View {
     /// toggle to show/hide the Achievement map layer.
     struct AchievementsView: View {
         @EnvironmentObject private var journeys: JourneyRepository
+        @EnvironmentObject private var friends: FriendsStore
         @ObservedObject private var explore = ExploreStore.shared
         @AppStorage("Explore.enabled") private var exploreEnabled: Bool = false
         @Environment(\.dismiss) private var dismiss
@@ -242,6 +267,22 @@ struct SpotMapView: View {
         private var totalKm: Double { explore.totalDistanceKm(from: journeys.journeys) }
         private var level: Int { explore.level(for: totalKm) }
         private var progress: Double { explore.progressToNextLevel(for: totalKm) }
+        private var badges: [AchievementBadge] {
+            AchievementsCatalog.badges(
+                totalKm: totalKm,
+                visitedCities: explore.visitedCities.count,
+                visitedTiles: explore.visitedTiles.count,
+                journeys: journeys.journeys
+            )
+        }
+        private var facts: [ExploreFact] {
+            AchievementsCatalog.facts(
+                totalKm: totalKm,
+                visitedCities: explore.visitedCities.count,
+                visitedTiles: explore.visitedTiles.count,
+                journeys: journeys.journeys
+            )
+        }
         
         var body: some View {
             NavigationStack {
@@ -273,6 +314,44 @@ struct SpotMapView: View {
                         .padding(14)
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                        // Badges
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Badges")
+                                .font(.headline)
+
+                            ForEach(badges) { badge in
+                                HStack(spacing: 12) {
+                                    Image(systemName: badge.systemImage)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .frame(width: 32, height: 32)
+                                        .background(badge.isUnlocked ? Color.green.opacity(0.18) : Color.gray.opacity(0.15))
+                                        .clipShape(Circle())
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(badge.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(badge.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if badge.isUnlocked {
+                                        Text("Unlocked")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.green)
+                                    } else {
+                                        Text("\(Int(badge.progress * 100))%")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                ProgressView(value: badge.progress)
+                                    .tint(badge.isUnlocked ? .green : .blue)
+                            }
+                        }
+                        .padding(14)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         
                         // Map layer toggle
                         VStack(alignment: .leading, spacing: 10) {
@@ -287,6 +366,33 @@ struct SpotMapView: View {
                             Text("Zet deze laag aan om je vrijgespeelde gebieden op de kaart te zien.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
+                        }
+                        .padding(14)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                        // Friends leaderboard
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Vrienden competitie")
+                                .font(.headline)
+                            if friends.friends.isEmpty {
+                                Text("Voeg vrienden toe om te vergelijken.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                let ranked = friends.friends.sorted { ($0.totalDistanceKm ?? 0) > ($1.totalDistanceKm ?? 0) }
+                                ForEach(ranked.prefix(5)) { friend in
+                                    HStack {
+                                        Text(friend.displayName)
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                        Text(String(format: "%.0f km", friend.totalDistanceKm ?? 0))
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Divider().opacity(0.25)
+                                }
+                            }
                         }
                         .padding(14)
                         .background(.ultraThinMaterial)
@@ -336,6 +442,30 @@ struct SpotMapView: View {
                                         Divider().opacity(0.25)
                                     }
                                 }
+                            }
+                        }
+                        .padding(14)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                        // Facts
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Stats & feiten")
+                                .font(.headline)
+                            ForEach(facts) { fact in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(fact.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(fact.detail)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(fact.value)
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                Divider().opacity(0.25)
                             }
                         }
                         .padding(14)
@@ -543,13 +673,24 @@ private struct SpotMapMapLayer: View {
                                 .stroke(.blue, lineWidth: 8)
                         }
 
+                        MapPolyline(RailNetwork.linePolyline)
+                            .stroke(.red.opacity(0.7), lineWidth: 4)
+
+                        ForEach(RailNetwork.nodes) { node in
+                            Marker(node.name, coordinate: node.coordinate)
+                        }
+
                         // Friends (optional)
                         ForEach(friends.friends) { f in
                             if let c = f.coordinate {
-                                Marker(f.displayName, coordinate: c)
+                                Marker(f.mapLabel, coordinate: c)
                             }
-                            if let data = f.lastJourneyZlib,
+                            if let data = f.liveJourneyZlib,
                                let poly = FriendRouteDecoder.polyline(fromZlib: data) {
+                                MapPolyline(poly)
+                                    .stroke(.green.opacity(0.6), lineWidth: 4)
+                            } else if let data = f.lastJourneyZlib,
+                                      let poly = FriendRouteDecoder.polyline(fromZlib: data) {
                                 MapPolyline(poly)
                                     .stroke(.blue.opacity(0.35), lineWidth: 4)
                             }
@@ -710,6 +851,7 @@ private struct SpotMapSheetPresenter: ViewModifier {
             .sheet(isPresented: $showingAchievements) {
                 SpotMapView.AchievementsView()
                     .environmentObject(journeys)
+                    .environmentObject(friends)
                     .presentationDetents([.medium, .large])
             }
     }
