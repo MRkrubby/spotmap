@@ -62,11 +62,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         // We clone these per cloud so we get TRUE 3D from the supplied models.
         private var prototypes: [CloudAsset: SCNNode] = [:]
 
-        // Stable base yaw per cloud id (avoid SCNNode.userData which may be unavailable on some platforms)
-        private var baseYawRotations: [UInt64: Float] = [:]
-
         private var didConfigure: Bool = false
-        private static let facingYawOffset: Float = .pi / 18
 
         init() {
             scene.rootNode.addChildNode(cloudRoot)
@@ -134,7 +130,6 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             for (id, node) in cloudNodes where !incoming.contains(id) {
                 node.removeFromParentNode()
                 cloudNodes.removeValue(forKey: id)
-                baseYawRotations.removeValue(forKey: id)
             }
 
             // Update / create.
@@ -184,33 +179,11 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
 
                 // Orientation: base random yaw only (no camera-driven pitch/roll).
                 // Keep a stable base rotation per cloud id to avoid accumulating rotations across updates.
-                let baseYaw: Float
-                if let cached = baseYawRotations[item.id] {
-                    baseYaw = cached
-                } else {
-                    let yaw = Float((Double(item.seed & 0xFFFF) / 65535.0) * 2.0 * .pi)
-                    baseYaw = yaw
-                    baseYawRotations[item.id] = yaw
-                }
-
-                // Fixed yaw offset to keep a subtle, consistent facing adjustment.
-                let yaw: Float = Self.wrapRadians(baseYaw + Self.facingYawOffset)
-                let qYaw: simd_quatf = simd_quatf(angle: yaw, axis: SIMD3<Float>(0, 1, 0))
-                node.simdOrientation = qYaw
+                CloudOrientationPolicy.current.apply(to: node, seed: item.seed)
             }
 
             SCNTransaction.commit()
         }
-
-        private static func wrapRadians(_ a: Float) -> Float {
-            var x = a
-            let twoPi: Float = 2 * .pi
-            // Wrap to (-π, +π]
-            x = fmodf(x + .pi, twoPi)
-            if x < 0 { x += twoPi }
-            return x - .pi
-        }
-
 
         private static func centerPivot(_ node: SCNNode) {
             // Ensure rotations don't shift the node in screen-space.

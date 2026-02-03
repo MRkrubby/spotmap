@@ -68,10 +68,15 @@ final class SceneSpriteCache {
             // Deterministic pose per variant.
             var rng = SplitMix64(seed: UInt64(variant) &* 0x9E3779B97F4A7C15)
             let s = Float(0.92 + 0.22 * rng.nextDouble())
-            let rot = Float(rng.nextDouble() * Double.pi * 2.0)
             let lift = Float(0.04 + 0.10 * rng.nextDouble())
             node.scale = SCNVector3(s, s, s)
-            node.eulerAngles = SCNVector3(0, rot, 0)
+            if let yaw = CloudOrientationPolicy.current.yawRadians(seed: UInt64(variant)) {
+                node.eulerAngles = SCNVector3(0, yaw, 0)
+            } else {
+                let billboard = SCNBillboardConstraint()
+                billboard.freeAxes = [.Y]
+                node.constraints = (node.constraints ?? []) + [billboard]
+            }
             node.position = SCNVector3(0, lift, 0)
         }
     }
