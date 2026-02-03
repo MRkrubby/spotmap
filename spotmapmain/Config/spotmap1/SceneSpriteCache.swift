@@ -187,6 +187,10 @@ final class SceneSpriteCache {
         lock.lock(); defer { lock.unlock() }
         if let p = modelProto[assetPath] { return p }
 
+        guard assetFilename(from: assetPath) != nil else {
+            return SCNNode()
+        }
+
         let fallback: AssetBundleResolver.FallbackNode = kind == .cloud ? .voxelCloud : .empty
         let node = AssetBundleResolver.loadSceneNode(
             assetPath: assetPath,
@@ -203,6 +207,15 @@ final class SceneSpriteCache {
         Self.enforceYAxisBillboards(node)
         modelProto[assetPath] = node
         return node
+    }
+
+    private func assetFilename(from assetPath: String) -> String? {
+        let parts = assetPath.split(separator: "/")
+        guard let filename = parts.last else {
+            log.error("Asset path missing filename: \(assetPath, privacy: .public)")
+            return nil
+        }
+        return String(filename)
     }
 
     private static func enforceYAxisBillboards(_ node: SCNNode) {
