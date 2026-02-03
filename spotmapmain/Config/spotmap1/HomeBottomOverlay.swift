@@ -390,7 +390,7 @@ struct HomeMenuSheet: View {
     }
 
     private var isAddFriendCodeValid: Bool {
-        trimmedAddFriendCode.count >= 6
+        FriendsStore.isValidFriendCode(trimmedAddFriendCode)
     }
 
     var body: some View {
@@ -406,14 +406,32 @@ struct HomeMenuSheet: View {
                                 .font(.title3.weight(.semibold))
                         }
                         Spacer()
-                        Button {
-                            UIPasteboard.general.string = friends.myCode()
-                        } label: {
-                            Label("Kopieer", systemImage: "doc.on.doc")
+                        VStack(alignment: .trailing, spacing: 8) {
+                            Button {
+                                UIPasteboard.general.string = friends.myCode()
+                            } label: {
+                                Label("Kopieer", systemImage: "doc.on.doc")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Button {
+                                Task {
+                                    let changed = await friends.regenerateMyCode()
+                                    if changed {
+                                        await friends.publish()
+                                    }
+                                }
+                            } label: {
+                                Label("Nieuwe code", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
                     }
+                    Text("Tip: je kunt maximaal 2x per dag een nieuwe code genereren. Oude codes werken dan niet meer.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
 
                     Button {
                         showingAddFriend = true
@@ -423,6 +441,11 @@ struct HomeMenuSheet: View {
 
                     if let err = friends.lastError {
                         Text(err)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let warning = friends.lastFriendAddWarning {
+                        Text(warning)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -436,15 +459,28 @@ struct HomeMenuSheet: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(f.displayName)
+                                    Text(f.statusText)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                     Text(f.code)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                if let date = f.updatedAt {
-                                    Text(date, style: .time)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    if let totalKm = f.totalDistanceKm {
+                                        Text(String(format: "%.0f km", totalKm))
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    if let level = f.level {
+                                        Text("Level \(level)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    } else if let date = f.updatedAt {
+                                        Text(date, style: .time)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                             .swipeActions {
