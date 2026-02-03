@@ -359,11 +359,12 @@ struct SpotMapView: View {
         let title: String
         let value: String
         let systemImage: String
+        @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 16
         
         var body: some View {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.caption)
@@ -395,6 +396,7 @@ private struct SpotMapHeader: View {
     let onRefresh: () -> Void
     let onOpenSettings: () -> Void
     let onFocusUser: () -> Void
+    @ScaledMetric(relativeTo: .body) private var menuIconSize: CGFloat = 15
 
     var body: some View {
         HStack(spacing: 12) {
@@ -407,7 +409,7 @@ private struct SpotMapHeader: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("SpotMap")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                     Text(vm.repo.backend.title)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -473,7 +475,7 @@ private struct SpotMapHeader: View {
                         .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
                         .shadow(radius: 6)
                     Image(systemName: "ellipsis")
-                        .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                        .font(.system(size: menuIconSize, weight: .semibold))
                 }
             }
             .accessibilityLabel("Menu")
