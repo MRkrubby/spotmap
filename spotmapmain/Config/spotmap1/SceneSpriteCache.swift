@@ -195,8 +195,28 @@ final class SceneSpriteCache {
             node = SCNNode()
         }
 
+        Self.enforceYAxisBillboards(node)
         modelProto[assetPath] = node
         return node
+    }
+
+    private static func enforceYAxisBillboards(_ node: SCNNode) {
+        if let constraints = node.constraints {
+            for constraint in constraints {
+                if let billboard = constraint as? SCNBillboardConstraint {
+                    billboard.freeAxes = [.Y]
+                }
+            }
+        }
+        node.enumerateChildNodes { child, _ in
+            if let constraints = child.constraints {
+                for constraint in constraints {
+                    if let billboard = constraint as? SCNBillboardConstraint {
+                        billboard.freeAxes = [.Y]
+                    }
+                }
+            }
+        }
     }
 
     private func normalizePivot(_ node: SCNNode) {
