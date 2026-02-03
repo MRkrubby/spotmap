@@ -21,7 +21,8 @@ struct SpotMapView: View {
     @StateObject private var mapCoordinator = SpotMapCoordinator(fog: FogOfWarStore.shared)
     
     @AppStorage("Explore.enabled") private var exploreEnabled: Bool = false
-    @State private var publishDebouncer = Debouncer()
+    @State private var locationPublishDebouncer = Debouncer()
+    @State private var liveJourneyPublishDebouncer = Debouncer()
     
     @State private var selection: String? = nil
     @State private var autoStartNavigationTask: Task<Void, Never>? = nil
@@ -158,7 +159,7 @@ struct SpotMapView: View {
                 // Friends publish is handled by RootTabView lifecycle,
                 // but we still update the in-memory location here.
                 friends.updateMyLocation(loc)
-                publishDebouncer.schedule(delay: .seconds(3)) {
+                locationPublishDebouncer.schedule(delay: .seconds(3)) {
                     Task { await friends.publish() }
                 }
             }
@@ -176,7 +177,7 @@ struct SpotMapView: View {
                     visitedCitiesCount: ExploreStore.shared.visitedCities.count,
                     visitedTilesCount: ExploreStore.shared.visitedTiles.count
                 )
-                publishDebouncer.schedule(delay: .seconds(2)) {
+                locationPublishDebouncer.schedule(delay: .seconds(2)) {
                     Task { await friends.publish() }
                 }
             }
@@ -184,14 +185,14 @@ struct SpotMapView: View {
                 guard journeys.isRecording else { return }
                 let points = journeys.liveShareJourneyPoints()
                 friends.updateMyLiveJourney(points: points, speedMps: journeys.currentSpeedMps)
-                publishDebouncer.schedule(delay: .seconds(3)) {
+                liveJourneyPublishDebouncer.schedule(delay: .seconds(3)) {
                     Task { await friends.publish() }
                 }
             }
             .onChange(of: journeys.isRecording) { _, isRecording in
                 if !isRecording {
                     friends.clearLiveJourney()
-                    publishDebouncer.schedule(delay: .seconds(2)) {
+                    liveJourneyPublishDebouncer.schedule(delay: .seconds(2)) {
                         Task { await friends.publish() }
                     }
                 }
