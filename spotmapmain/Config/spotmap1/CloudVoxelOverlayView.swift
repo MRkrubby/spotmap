@@ -49,6 +49,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
     // MARK: - Coordinator
 
     final class Coordinator {
+        private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "spotmap", category: "CloudVoxelOverlay")
         let scene = SCNScene()
         private let cloudRoot = SCNNode()
         private let cameraNode = SCNNode()
@@ -228,7 +229,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             if let cached = prototypes[asset] {
                 proto = cached
             } else {
-                proto = loadPrototype(asset: asset) ?? Self.makeFallbackVoxelCloud()
+                proto = loadPrototype(asset: asset)
                 prototypes[asset] = proto
             }
 
@@ -297,40 +298,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 n.position = SCNVector3(x * 70, y * 60, z * 40)
                 container.addChildNode(n)
             }
-
-            // Center pivot.
-            let (minV, maxV) = container.boundingBox
-            let center = SCNVector3((minV.x + maxV.x) * 0.5, (minV.y + maxV.y) * 0.5, (minV.z + maxV.z) * 0.5)
-            container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
-            return container
-        }
-
-        private func loadPrototype(asset: CloudAsset) -> SCNNode? {
-            guard let url = AssetBundleResolver.resolveURL(for: asset.rawValue) else {
-                #if DEBUG
-                print("[CloudVoxelOverlayView] Missing USDZ in bundle: \(asset.rawValue)")
-                #endif
-                return nil
-            }
-
-            // Load USDZ into SceneKit.
-            guard let ref = SCNReferenceNode(url: url) else { return nil }
-            ref.load()
-
-            // Normalize pivot to its bounding box center so scaling/rotation behaves nicely.
-            let container = SCNNode()
-            container.addChildNode(ref)
-
-            // Center pivot for consistent placement.
-            let (minV, maxV) = container.boundingBox
-            let center = SCNVector3(
-                (minV.x + maxV.x) * 0.5,
-                (minV.y + maxV.y) * 0.5,
-                (minV.z + maxV.z) * 0.5
-            )
-            container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
-
-            return container
+            return node
         }
 
         // MARK: - Tiny RNG

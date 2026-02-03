@@ -145,7 +145,7 @@ final class SceneSpriteCache {
         lights(root)
 
         // Load model prototype and clone it.
-        let proto = loadPrototype(assetPath: assetPath)
+        let proto = loadPrototype(assetPath: assetPath, kind: kind)
         let model = proto.clone()
         normalizePivot(model)
         pose(model)
@@ -178,21 +178,21 @@ final class SceneSpriteCache {
         return image
     }
 
-    private func loadPrototype(assetPath: String) -> SCNNode {
+    private func loadPrototype(assetPath: String, kind: Kind) -> SCNNode {
         lock.lock(); defer { lock.unlock() }
         if let p = modelProto[assetPath] { return p }
 
-        let url = AssetBundleResolver.resolveURL(for: assetPath, log: log)
-        let node: SCNNode
-
-        if let url {
+        let fallback: AssetBundleResolver.FallbackNode = kind == .cloud ? .voxelCloud : .empty
+        let node = AssetBundleResolver.loadSceneNode(
+            assetPath: assetPath,
+            log: log,
+            fallback: fallback
+        ) { url in
             // Prefer ModelIO for USDZ: it tends to preserve materials and gives stable bounds.
             let mdlAsset = MDLAsset(url: url)
             let scene = SCNScene(mdlAsset: mdlAsset)
             // Flatten so bounding boxes/pivots are reliable for sprite framing.
-            node = scene.rootNode.flattenedClone()
-        } else {
-            node = SCNNode()
+            return scene.rootNode.flattenedClone()
         }
 
         Self.enforceYAxisBillboards(node)
