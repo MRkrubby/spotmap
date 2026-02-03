@@ -711,7 +711,7 @@ private struct SpotMapMapLayer: View {
                             if let c = f.coordinate {
                                 Marker(f.mapLabel, coordinate: c)
                             }
-                            if let data = f.liveJourneyZlib,
+                            if let data = friends.liveJourneyZlib(for: f),
                                let poly = FriendRouteDecoder.polyline(fromZlib: data) {
                                 MapPolyline(poly)
                                     .stroke(.green.opacity(0.6), lineWidth: 4)
