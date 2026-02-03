@@ -24,11 +24,12 @@ struct SpotCircleButton: View {
     let systemImage: String
     var accessibilityLabel: String
     var action: () -> Void
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 15
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
                 .background(.ultraThinMaterial)
                 .clipShape(Circle())
@@ -54,12 +55,13 @@ private struct SpotPressScaleStyle: ButtonStyle {
 struct SpotPill: View {
     let text: String
     var icon: String? = nil
+    @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 12
 
     var body: some View {
         HStack(spacing: 8) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
             }
             Text(text)
                 .font(.caption.weight(.semibold))
@@ -94,7 +96,7 @@ struct SpotTopBar: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("SpotMap")
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.headline.weight(.bold))
                         Text(backendTitle)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -241,6 +243,8 @@ struct SpotFabMenu: View {
 
     @Binding var isOpen: Bool
     private let items: () -> [Item]
+    @ScaledMetric(relativeTo: .caption) private var menuIconSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .headline) private var fabIconSize: CGFloat = 17
 
     init(isOpen: Binding<Bool>, @ItemBuilder items: @escaping () -> [Item]) {
         self._isOpen = isOpen
@@ -262,7 +266,7 @@ struct SpotFabMenu: View {
                             Text(item.title)
                                 .font(.caption.weight(.semibold))
                             Image(systemName: item.systemImage)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: menuIconSize, weight: .semibold))
                                 .frame(width: 30, height: 30)
                                 .background(.thinMaterial)
                                 .clipShape(Circle())
@@ -292,7 +296,7 @@ struct SpotFabMenu: View {
                         .shadow(radius: 8)
 
                     Image(systemName: isOpen ? "xmark" : "plus")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: fabIconSize, weight: .bold))
                 }
             }
             .padding(4)
@@ -322,7 +326,7 @@ struct HomeHeaderBar: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("SpotMap")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                     Text(backendTitle)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -590,12 +594,14 @@ private struct HomeSpotRow: View {
                 Text(spot.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 if !spot.note.isEmpty {
                     Text(spot.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
             }
 
@@ -625,10 +631,12 @@ private struct HomeJourneyRow: View {
                 Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text("Duur \(JourneyFormat.duration(record.duration))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
             Spacer(minLength: 0)

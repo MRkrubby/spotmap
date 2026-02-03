@@ -179,12 +179,14 @@ struct HomeBottomOverlay: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(c.title)
                                     .font(.body.weight(.semibold))
-                                    .lineLimit(1)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.85)
                                 if !c.subtitle.isEmpty {
                                     Text(c.subtitle)
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -286,7 +288,8 @@ struct HomeBottomOverlay: View {
                     }
                     Text(nav.destinationName ?? "Bestemming")
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -331,8 +334,9 @@ struct HomeBottomOverlay: View {
         VStack(spacing: overlaySpacing) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(nav.instruction.isEmpty ? (nav.destinationName ?? "Route") : nav.instruction)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.headline.weight(.bold))
                     .lineLimit(2)
+                    .minimumScaleFactor(0.85)
 
                 if nav.distanceToNextManeuverMeters > 0 {
                     Text("Over \(formatDistance(nav.distanceToNextManeuverMeters))")

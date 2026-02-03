@@ -43,6 +43,8 @@ struct JourneysView: View {
                 Text("Routes worden automatisch bijgehouden vanaf het moment dat je SpotMap opent.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
             }
             Spacer()
             Button {
@@ -65,6 +67,8 @@ struct JourneysView: View {
                     Text(journeys.trackingEnabled ? "Je route en stats worden gelogd (ook in achtergrond als toegestaan)." : "Zet tracking aan om routes te loggen.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
                 Spacer()
 
@@ -181,15 +185,18 @@ private struct JourneyRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.headline)
+                    .minimumScaleFactor(0.85)
                 Text("\(JourneyFormat.km(record.distanceMeters)) • \(JourneyFormat.duration(record.duration))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .minimumScaleFactor(0.85)
             }
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text(JourneyFormat.speedKmh(record.avgSpeedMps))
                     .font(.headline)
+                    .minimumScaleFactor(0.85)
                 Text("avg")
                     .font(.caption)
                     .foregroundStyle(.secondary)
