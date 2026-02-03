@@ -267,11 +267,11 @@ final class FriendsStore: ObservableObject {
         persistMe()
     }
 
-    func updateMyLiveJourney(points: [CLLocationCoordinate2D], speedMps: Double) {
+    func updateMyLiveJourney(points: [JourneyPoint], speedMps: Double) {
         guard !points.isEmpty else { return }
         guard shouldPublishLiveJourney() else { return }
         let now = Date()
-        let journeyPoints = points.map { JourneyPoint(lat: $0.latitude, lon: $0.longitude, ts: now, speedMps: max(0, speedMps)) }
+        let journeyPoints = pruneLiveJourneyPoints(points)
         let zipped = JourneySerialization.encode(points: journeyPoints)
         guard me.liveJourneyZlib != zipped else { return }
         me.liveJourneyZlib = zipped
@@ -296,6 +296,26 @@ final class FriendsStore: ObservableObject {
         me.visitedCitiesCount = visitedCitiesCount
         me.visitedTilesCount = visitedTilesCount
         persistMe()
+    }
+
+    private func pruneLiveJourneyPoints(_ points: [JourneyPoint]) -> [JourneyPoint] {
+        let maxPoints = 300
+        guard points.count > maxPoints else { return points }
+        let strideSize = Int(ceil(Double(points.count) / Double(maxPoints)))
+        guard strideSize > 1 else { return Array(points.suffix(maxPoints)) }
+
+        var downsampled: [JourneyPoint] = []
+        downsampled.reserveCapacity(maxPoints)
+        for index in stride(from: 0, to: points.count, by: strideSize) {
+            downsampled.append(points[index])
+        }
+        if let last = points.last, downsampled.last?.ts != last.ts {
+            downsampled.append(last)
+        }
+        if downsampled.count > maxPoints {
+            downsampled = Array(downsampled.suffix(maxPoints))
+        }
+        return downsampled
     }
 
     func regenerateMyCode() async -> Bool {

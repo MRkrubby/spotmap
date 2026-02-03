@@ -44,6 +44,8 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
     // Points for the current app session (shown on the Home map as "where you drove since start")
     private var sessionPoints: [JourneyPoint] = []
     private var sessionLastAcceptedLocation: CLLocation?
+    // Rolling buffer for live sharing (kept small to avoid expensive compression).
+    private var liveSharePoints: [JourneyPoint] = []
 
     private var segmentIsActive: Bool = false
     private var lastAverageSampleAt: Date?
@@ -57,6 +59,7 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
     private let maxAcceptableAccuracy: CLLocationAccuracy = 65
     private let maxSessionPoints: Int = 3000
     private let sessionPointTimeWindow: TimeInterval = 6 * 60 * 60
+    private let maxLiveSharePoints: Int = 300
 
     // Auto segmentation
     private let stationarySpeedThresholdMps: Double = 1.0       // ~3.6 km/h
@@ -147,6 +150,7 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         // Reset points
         segmentPoints.removeAll(keepingCapacity: true)
         sessionPoints.removeAll(keepingCapacity: true)
+        liveSharePoints.removeAll(keepingCapacity: true)
         segmentLastAcceptedLocation = nil
         sessionLastAcceptedLocation = nil
         segmentIsActive = false
@@ -183,6 +187,7 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         startedAt = nil
         segmentPoints.removeAll()
         sessionPoints.removeAll()
+        liveSharePoints.removeAll()
         segmentLastAcceptedLocation = nil
         sessionLastAcceptedLocation = nil
         segmentIsActive = false
@@ -211,6 +216,10 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
 
     func sessionPolyline() -> [CLLocationCoordinate2D] {
         sessionPoints.map { $0.coordinate }
+    }
+
+    func liveShareJourneyPoints() -> [JourneyPoint] {
+        liveSharePoints
     }
 
     // MARK: - CLLocationManagerDelegate
@@ -275,7 +284,14 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
         }
 
         // Add to session points (always)
-        sessionPoints.append(JourneyPoint(lat: loc.coordinate.latitude, lon: loc.coordinate.longitude, ts: loc.timestamp, speedMps: currentSpeedMps))
+        let sessionPoint = JourneyPoint(
+            lat: loc.coordinate.latitude,
+            lon: loc.coordinate.longitude,
+            ts: loc.timestamp,
+            speedMps: currentSpeedMps
+        )
+        sessionPoints.append(sessionPoint)
+        appendLiveSharePoint(sessionPoint)
         sessionLastAcceptedLocation = loc
         pruneSessionPoints(now: loc.timestamp)
 
@@ -428,6 +444,13 @@ final class JourneyRepository: NSObject, ObservableObject, CLLocationManagerDele
             downsampled.append(last)
         }
         sessionPoints = downsampled
+    }
+
+    private func appendLiveSharePoint(_ point: JourneyPoint) {
+        liveSharePoints.append(point)
+        guard liveSharePoints.count > maxLiveSharePoints else { return }
+        let overflow = liveSharePoints.count - maxLiveSharePoints
+        liveSharePoints.removeFirst(overflow)
     }
 }
 
