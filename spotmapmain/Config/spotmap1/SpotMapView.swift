@@ -15,6 +15,8 @@ struct SpotMapView: View {
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var friends: FriendsStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var vm: SpotMapViewModel
     @StateObject private var mapCoordinator = SpotMapCoordinator(fog: FogOfWarStore.shared)
     
@@ -33,6 +35,23 @@ struct SpotMapView: View {
     init() {
         let repo = SpotRepository()
         _vm = StateObject(wrappedValue: SpotMapViewModel(repo: repo))
+    }
+
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var headerHorizontalPadding: CGFloat {
+        if isCompactHeight { return 8 }
+        return isRegularWidth ? 20 : 12
+    }
+
+    private var headerTopPadding: CGFloat {
+        isCompactHeight ? 4 : 10
     }
     
     var body: some View {
@@ -64,19 +83,19 @@ struct SpotMapView: View {
                             onOpenSettings: { showingSettings = true },
                             onFocusUser: { vm.focusOnUser() }
                         )
-                            .padding(.top, 10)
-                            .padding(.horizontal, 12)
+                            .padding(.top, headerTopPadding)
+                            .padding(.horizontal, headerHorizontalPadding)
                         
                         if vm.repo.isLoading {
-                            SpotLoadingPill(text: vm.repo.spots.isEmpty ? "spotmap.loading" : "spotmap.updating")
-                                .padding(.horizontal, 12)
+                            SpotLoadingPill(text: vm.repo.spots.isEmpty ? "Laden…" : "Bijwerken…")
+                                .padding(.horizontal, headerHorizontalPadding)
                         }
                         
                         if journeys.isRecording {
                             SpotLoadingPill(
                                 text: "spotmap.recording_status \(JourneyFormat.km(journeys.currentDistanceMeters)) \(JourneyFormat.speedKmh(journeys.currentSpeedMps))"
                             )
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, headerHorizontalPadding)
                         }
                     }
                     
@@ -90,14 +109,19 @@ struct SpotMapView: View {
             // - route preview
             // - navigation HUD
             .safeAreaInset(edge: .bottom) {
-                SpotMapOverlays(
-                    vm: vm,
-                    onOpenSpots: { showingSpotsList = true },
-                    onAddSpot: { vm.showingAdd = true },
-                    onOpenJourneys: { showingJourneysSheet = true },
-                    onOpenSettings: { showingSettings = true },
-                    onToggleTracking: { journeys.toggle() }
-                )
+                HStack {
+                    if isCompactHeight { Spacer() }
+                    SpotMapOverlays(
+                        vm: vm,
+                        onOpenSpots: { showingSpotsList = true },
+                        onAddSpot: { vm.showingAdd = true },
+                        onOpenJourneys: { showingJourneysSheet = true },
+                        onOpenSettings: { showingSettings = true },
+                        onToggleTracking: { journeys.toggle() }
+                    )
+                    .frame(maxWidth: isCompactHeight && !isRegularWidth ? 420 : .infinity, alignment: .trailing)
+                }
+                .padding(.horizontal, isCompactHeight ? 12 : 0)
             }
             
             // Errors
@@ -359,11 +383,12 @@ private struct StatPill: View {
         let title: LocalizedStringKey
         let value: String
         let systemImage: String
+        @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 16
         
         var body: some View {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.caption)
@@ -395,6 +420,7 @@ private struct SpotMapHeader: View {
     let onRefresh: () -> Void
     let onOpenSettings: () -> Void
     let onFocusUser: () -> Void
+    @ScaledMetric(relativeTo: .body) private var menuIconSize: CGFloat = 15
 
     var body: some View {
         HStack(spacing: 12) {
@@ -406,8 +432,8 @@ private struct SpotMapHeader: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("spotmap.app_name")
-                        .font(.system(size: 16, weight: .bold))
+                    Text("SpotMap")
+                        .font(.headline.weight(.bold))
                     Text(vm.repo.backend.title)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -473,7 +499,7 @@ private struct SpotMapHeader: View {
                         .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
                         .shadow(radius: 6)
                     Image(systemName: "ellipsis")
-                        .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                        .font(.system(size: menuIconSize, weight: .semibold))
                 }
             }
             .accessibilityLabel(Text("spotmap.menu_accessibility"))
@@ -622,7 +648,7 @@ private struct SpotMapMapLayer: View {
                     let items: [CloudVoxelItem] = fogCloudField.clouds.map { cloud in
                         CloudVoxelItem(
                             id: cloud.id,
-                            mapPoint: MKMapPoint(cloud.coordinate),
+                            coordinate: cloud.coordinate,
                             sizeMeters: cloud.sizeMeters,
                             altitudeMeters: cloud.altitudeMeters,
                             asset: cloud.asset,
@@ -632,7 +658,9 @@ private struct SpotMapMapLayer: View {
 
                     CloudVoxelOverlayView(
                         items: items,
-                        viewportSize: geo.size
+                        viewportSize: geo.size,
+                        centerCoordinate: fogCloudField.centerCoordinateNow,
+                        metersPerPoint: fogCloudField.metersPerPointNow
                     )
                     .frame(width: geo.size.width, height: geo.size.height)
                     .allowsHitTesting(false)

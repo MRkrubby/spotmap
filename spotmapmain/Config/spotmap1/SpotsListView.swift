@@ -132,6 +132,7 @@ private struct SpotRow: View {
                     Text(spot.title)
                         .font(.headline)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
 
                     Spacer(minLength: 0)
 
@@ -139,6 +140,7 @@ private struct SpotRow: View {
                         Text(distanceText)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
+                            .minimumScaleFactor(0.85)
                     }
                 }
 
@@ -152,6 +154,7 @@ private struct SpotRow: View {
                 Text("\(spot.latitude, format: .number.precision(.fractionLength(5))), \(spot.longitude, format: .number.precision(.fractionLength(5)))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .minimumScaleFactor(0.85)
             }
 
             Spacer(minLength: 0)

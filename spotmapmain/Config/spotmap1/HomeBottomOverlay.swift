@@ -14,6 +14,8 @@ struct HomeBottomOverlay: View {
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var friends: FriendsStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @ObservedObject var repo: SpotRepository
     @ObservedObject private var explore = ExploreStore.shared
@@ -31,8 +33,29 @@ struct HomeBottomOverlay: View {
     @State private var showingSteps = false
     @State private var showingHomeMenu = false
 
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var overlaySpacing: CGFloat {
+        isCompactHeight ? 6 : 10
+    }
+
+    private var cardPadding: CGFloat {
+        isCompactHeight ? 10 : 12
+    }
+
+    private var horizontalInset: CGFloat {
+        if isCompactHeight { return 10 }
+        return isRegularWidth ? 18 : 14
+    }
+
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: overlaySpacing) {
             if nav.isNavigating {
                 guidanceUI
             } else if nav.isPreviewing {
@@ -60,25 +83,25 @@ struct HomeBottomOverlay: View {
     // MARK: - Search
 
     private var searchUI: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: SpotDesign.Spacing.md) {
             searchBar
 
             if isSearchFocused || !places.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 if places.isSearching {
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
                         ProgressView()
                         Text("home.searching")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, SpotDesign.Spacing.sm)
                 } else if !places.completions.isEmpty {
                     Text("home.search_results_count \(places.completions.count)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, SpotDesign.Spacing.sm)
                 }
 
                 resultsPanel
@@ -87,7 +110,7 @@ struct HomeBottomOverlay: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
@@ -104,8 +127,13 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Wis zoekopdracht")
+                .accessibilityAddTraits(.isButton)
             }
 
             if isSearchFocused || !places.query.isEmpty {
@@ -124,40 +152,46 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 2)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open menu")
+                .accessibilityAddTraits(.isButton)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
+        .padding(.vertical, isCompactHeight ? 8 : 12)
+        .padding(.horizontal, horizontalInset)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.10)))
     }
 
     private var resultsPanel: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: SpotDesign.Spacing.none) {
             // Destinations
             if !places.completions.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.md) {
                     ForEach(places.completions, id: \.self) { c in
                         Button {
                             selectCompletion(c)
                         } label: {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                                 Text(c.title)
                                     .font(.body.weight(.semibold))
-                                    .lineLimit(1)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.85)
                                 if !c.subtitle.isEmpty {
                                     Text(c.subtitle)
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
+                                        .minimumScaleFactor(0.85)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 14)
+                            .padding(.vertical, SpotDesign.Spacing.lg)
+                            .padding(.horizontal, SpotDesign.Spacing.xxl)
                         }
                         .buttonStyle(.plain)
 
@@ -168,16 +202,16 @@ struct HomeBottomOverlay: View {
 
             // Quick actions (only when not typing / no results)
             if places.completions.isEmpty {
-                VStack(spacing: 10) {
-                    HStack(spacing: 10) {
-                        quickAction(title: "home.action_spots", systemImage: "list.bullet", action: onOpenSpots)
-                        quickAction(title: "home.action_new_spot", systemImage: "mappin.and.ellipse", action: onAddSpot)
+                VStack(spacing: SpotDesign.Spacing.lg) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
+                        quickAction(title: "Spots", systemImage: "list.bullet", action: onOpenSpots)
+                        quickAction(title: "Nieuwe spot", systemImage: "mappin.and.ellipse", action: onAddSpot)
                     }
-                    HStack(spacing: 10) {
-                        quickAction(title: "home.action_journeys", systemImage: "car", action: onOpenJourneys)
-                        quickAction(title: "home.action_settings", systemImage: "gearshape", action: onOpenSettings)
+                    HStack(spacing: SpotDesign.Spacing.lg) {
+                        quickAction(title: "Journeys", systemImage: "car", action: onOpenJourneys)
+                        quickAction(title: "Instellingen", systemImage: "gearshape", action: onOpenSettings)
                     }
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
                         quickAction(
                             title: journeys.trackingEnabled ? "home.tracking_on" : "home.tracking_off",
                             systemImage: journeys.trackingEnabled ? "location.fill" : "location.slash",
@@ -188,17 +222,17 @@ struct HomeBottomOverlay: View {
                         })
                     }
                 }
-                .padding(14)
+                .padding(isCompactHeight ? 10 : 14)
             }
         }
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.10)))
-        .shadow(radius: 10)
+        .background(SpotDesign.Elevation.controlMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowPanel)
     }
 
     private func quickAction(title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
                 Image(systemName: systemImage)
                     .font(.subheadline.weight(.semibold))
                     .frame(width: 22)
@@ -206,8 +240,8 @@ struct HomeBottomOverlay: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
+            .padding(.vertical, isCompactHeight ? 8 : 12)
+            .padding(.horizontal, horizontalInset)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
         }
@@ -234,8 +268,8 @@ struct HomeBottomOverlay: View {
     // MARK: - Preview
 
     private var previewUI: some View {
-        HStack(spacing: 12) {
-            SpotCircleButton(systemImage: "chevron.left", accessibilityLabel: "home.back") {
+        HStack(spacing: SpotDesign.Spacing.xl) {
+            SpotCircleButton(systemImage: "chevron.left", accessibilityLabel: "Terug") {
                 // Back to search; keep query if you want to refine.
                 nav.clearAll()
                 isSearchFocused = true
@@ -244,8 +278,8 @@ struct HomeBottomOverlay: View {
             Button {
                 nav.startNavigation()
             } label: {
-                VStack(spacing: 2) {
-                    HStack(spacing: 8) {
+                VStack(spacing: SpotDesign.Spacing.xxs) {
+                    HStack(spacing: SpotDesign.Spacing.md) {
                         Text(primaryPreviewTime)
                             .font(.headline.monospacedDigit().weight(.bold))
                         Text(primaryPreviewDistance)
@@ -254,14 +288,15 @@ struct HomeBottomOverlay: View {
                     }
                     Text(nav.destinationName ?? String(localized: "home.destination_fallback"))
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 14)
+                .padding(.vertical, SpotDesign.Spacing.xl)
+                .padding(.horizontal, SpotDesign.Spacing.xxl)
                 .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous)
                         .fill(Color.blue)
                 )
             }
@@ -273,7 +308,7 @@ struct HomeBottomOverlay: View {
                 cancelSearch()
             }
         }
-        .padding(12)
+        .padding(cardPadding)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
         .shadow(radius: 12)
@@ -296,11 +331,12 @@ struct HomeBottomOverlay: View {
     // MARK: - Guidance
 
     private var guidanceUI: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: overlaySpacing) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(nav.instruction.isEmpty ? (nav.destinationName ?? String(localized: "home.route_fallback")) : nav.instruction)
-                    .font(.system(size: 16, weight: .bold))
+                Text(nav.instruction.isEmpty ? (nav.destinationName ?? "Route") : nav.instruction)
+                    .font(.headline.weight(.bold))
                     .lineLimit(2)
+                    .minimumScaleFactor(0.85)
 
                 if nav.distanceToNextManeuverMeters > 0 {
                     Text("home.over_distance \(formatDistance(nav.distanceToNextManeuverMeters))")
@@ -309,12 +345,12 @@ struct HomeBottomOverlay: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .padding(cardPadding)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.10)))
 
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                     Text(primaryGuidanceDistance)
                         .font(.headline.monospacedDigit().weight(.bold))
                     Text(primaryGuidanceTime)
@@ -327,9 +363,9 @@ struct HomeBottomOverlay: View {
                 if nav.offRouteMeters > 0 {
                     Text("home.off_route_distance \(Int(nav.offRouteMeters))")
                         .font(.caption.weight(.semibold))
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(.thinMaterial, in: Capsule())
+                        .padding(.vertical, SpotDesign.Spacing.sm)
+                        .padding(.horizontal, SpotDesign.Spacing.lg)
+                        .background(SpotDesign.Elevation.controlMaterial, in: Capsule())
                 }
 
                 SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "home.steps") {
@@ -346,12 +382,12 @@ struct HomeBottomOverlay: View {
                     Text("home.stop")
                         .font(.subheadline.weight(.semibold))
                         .frame(width: 54, height: 36)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
+                        .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(12)
+            .padding(cardPadding)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
             .shadow(radius: 12)
@@ -398,8 +434,8 @@ struct HomeMenuSheet: View {
             List {
                 Section("home.menu.friends") {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("home.menu.your_code")
+                        VStack(alignment: .leading, spacing: SpotDesign.Spacing.xs) {
+                            Text("Jouw code")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             Text(friends.myCode())
@@ -434,7 +470,7 @@ struct HomeMenuSheet: View {
                     } else {
                         ForEach(friends.friends) { f in
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                                     Text(f.displayName)
                                     Text(f.code)
                                         .font(.caption)
@@ -462,7 +498,7 @@ struct HomeMenuSheet: View {
                     let totalKm = explore.totalDistanceKm(from: journeys.journeys)
                     let lvl = explore.level(for: totalKm)
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: SpotDesign.Spacing.lg) {
                         HStack {
                             Text("home.menu.level \(lvl)")
                                 .font(.headline)
@@ -476,7 +512,7 @@ struct HomeMenuSheet: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, SpotDesign.Spacing.sm)
 
                     Toggle("home.menu.explore_on_map", isOn: $exploreEnabled)
                 }
@@ -513,6 +549,11 @@ struct HomeMenuSheet: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .padding(6)
+                    .contentShape(Rectangle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("Vernieuwen")
+                    .accessibilityAddTraits(.isButton)
                 }
             }
             .alert("home.menu.add_friend", isPresented: $showingAddFriend) {
@@ -524,8 +565,8 @@ struct HomeMenuSheet: View {
                 .disabled(!isAddFriendCodeValid)
                 Button("home.cancel", role: .cancel) { addFriendCode = "" }
             } message: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("home.menu.add_friend_help")
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.sm) {
+                    Text("Vraag je vriend om zijn/haar code en plak hem hier.")
                     if !trimmedAddFriendCode.isEmpty && !isAddFriendCodeValid {
                         Text("home.menu.friend_code_minimum")
                             .font(.footnote)
