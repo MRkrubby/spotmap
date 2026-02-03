@@ -622,7 +622,7 @@ private struct SpotMapMapLayer: View {
                     let items: [CloudVoxelItem] = fogCloudField.clouds.map { cloud in
                         CloudVoxelItem(
                             id: cloud.id,
-                            mapPoint: MKMapPoint(cloud.coordinate),
+                            coordinate: cloud.coordinate,
                             sizeMeters: cloud.sizeMeters,
                             altitudeMeters: cloud.altitudeMeters,
                             asset: cloud.asset,
@@ -632,7 +632,9 @@ private struct SpotMapMapLayer: View {
 
                     CloudVoxelOverlayView(
                         items: items,
-                        viewportSize: geo.size
+                        viewportSize: geo.size,
+                        centerCoordinate: fogCloudField.centerCoordinateNow,
+                        metersPerPoint: fogCloudField.metersPerPointNow
                     )
                     .frame(width: geo.size.width, height: geo.size.height)
                     .allowsHitTesting(false)
