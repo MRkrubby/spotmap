@@ -54,7 +54,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
 
     final class Coordinator {
         let scene = SCNScene()
-        private let root = SCNNode()
+        private let cloudRoot = SCNNode()
         private let cameraNode = SCNNode()
         private let lightNode = SCNNode()
 
@@ -71,7 +71,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         private var didConfigure: Bool = false
 
         init() {
-            scene.rootNode.addChildNode(root)
+            scene.rootNode.addChildNode(cloudRoot)
 
             let cam = SCNCamera()
             cam.usesOrthographicProjection = true
@@ -130,7 +130,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             }
 
             // Move origin to center of view.
-            root.position = SCNVector3(-Float(viewportSize.width * 0.5), Float(viewportSize.height * 0.5), 0)
+            cloudRoot.position = SCNVector3(-Float(viewportSize.width * 0.5), Float(viewportSize.height * 0.5), 0)
 
             // Remove missing.
             let incoming = Set(items.map { $0.id })
@@ -148,7 +148,12 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 } else {
                     node = makeAssetCloud(asset: item.asset, seed: item.seed)
                     cloudNodes[item.id] = node
-                    root.addChildNode(node)
+                    cloudRoot.addChildNode(node)
+                }
+
+                if node.parent !== cloudRoot {
+                    node.removeFromParentNode()
+                    cloudRoot.addChildNode(node)
                 }
 
                 // Position in "screen space" SceneKit coordinates.
