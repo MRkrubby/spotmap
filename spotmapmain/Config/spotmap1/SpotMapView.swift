@@ -699,6 +699,13 @@ private struct SpotMapMapLayer: View {
                                 .stroke(.blue, lineWidth: 8)
                         }
 
+                        MapPolyline(RailNetwork.linePolyline)
+                            .stroke(.red.opacity(0.7), lineWidth: 4)
+
+                        ForEach(RailNetwork.nodes) { node in
+                            Marker(node.name, coordinate: node.coordinate)
+                        }
+
                         // Friends (optional)
                         ForEach(friends.friends) { f in
                             if let c = f.coordinate {
