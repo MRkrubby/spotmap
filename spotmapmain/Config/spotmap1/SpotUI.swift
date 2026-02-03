@@ -60,7 +60,7 @@ enum SpotDesign {
 /// press state reliable and keeps all buttons responsive.
 struct SpotCircleButton: View {
     let systemImage: String
-    var accessibilityLabel: String
+    var accessibilityLabel: LocalizedStringKey
     var action: () -> Void
     @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 15
 
@@ -91,7 +91,7 @@ private struct SpotPressScaleStyle: ButtonStyle {
 }
 
 struct SpotPill: View {
-    let text: String
+    let text: LocalizedStringKey
     var icon: String? = nil
     @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 12
 
@@ -169,7 +169,7 @@ struct SpotSearchBar: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Zoek spot…", text: $text)
+            TextField("spotui.search_placeholder", text: $text)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
 
@@ -199,7 +199,7 @@ struct SpotSearchBar: View {
 // MARK: - Loading
 
 struct SpotLoadingPill: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(spacing: SpotDesign.Spacing.lg) {
@@ -231,7 +231,7 @@ struct SpotBottomBar: View {
             Button {
                 onRefresh()
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label("spotui.refresh", systemImage: "arrow.clockwise")
                     .font(.caption.weight(.semibold))
                     .padding(.vertical, SpotDesign.Spacing.md)
                     .padding(.horizontal, SpotDesign.Spacing.lg)
@@ -269,10 +269,10 @@ struct SpotFabMenu: View {
 
     struct Item: Identifiable {
         let id = UUID()
-        let title: String
+        let title: LocalizedStringKey
         let systemImage: String
         let action: () -> Void
-        init(title: String, systemImage: String, action: @escaping () -> Void) {
+        init(title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) {
             self.title = title
             self.systemImage = systemImage
             self.action = action
@@ -427,7 +427,7 @@ struct HomeBottomSheet: View {
                 HStack(spacing: SpotDesign.Spacing.lg) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    Text("Zoek bestemming")
+                    Text("spotui.search_destination")
                         .foregroundStyle(.primary)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.triangle.turn.up.right.diamond")
@@ -475,13 +475,13 @@ struct HomeBottomSheet: View {
             if expanded {
                 VStack(alignment: .leading, spacing: SpotDesign.Spacing.md) {
                     HStack {
-                        Text("Dichtbij")
+                        Text("spotui.section_nearby")
                             .font(.subheadline.weight(.bold))
                         Spacer(minLength: 0)
                         Button {
                             onShowSpots()
                         } label: {
-                            Text("Alles")
+                            Text("spotui.section_all")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.plain)
@@ -489,7 +489,7 @@ struct HomeBottomSheet: View {
                     }
 
                     if previewSpots.isEmpty {
-                        Text("Nog geen spots. Maak er één aan of refresh je omgeving.")
+                        Text("spotui.empty_spots")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.vertical, SpotDesign.Spacing.sm)
@@ -509,13 +509,13 @@ struct HomeBottomSheet: View {
                     Divider().opacity(0.45)
 
                     HStack {
-                        Text("Ritten")
+                        Text("spotui.section_journeys")
                             .font(.subheadline.weight(.bold))
                         Spacer(minLength: 0)
                         Button {
                             onOpenJourneys()
                         } label: {
-                            Text("Alles")
+                            Text("spotui.section_all")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.plain)
@@ -523,7 +523,7 @@ struct HomeBottomSheet: View {
                     }
 
                     if recentJourneys.isEmpty {
-                        Text("Nog geen ritten. Start een rit om te loggen.")
+                        Text("spotui.empty_journeys")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.vertical, SpotDesign.Spacing.xxs)
@@ -576,7 +576,7 @@ struct HomeBottomSheet: View {
 }
 
 private struct HomeActionChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let action: () -> Void
 
@@ -606,7 +606,7 @@ private struct HomePrimaryButton: View {
 }
 
 private struct HomeActionChipLabel: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
 
     var body: some View {

@@ -90,14 +90,14 @@ struct HomeBottomOverlay: View {
                 if places.isSearching {
                     HStack(spacing: SpotDesign.Spacing.lg) {
                         ProgressView()
-                        Text("Zoeken…")
+                        Text("home.searching")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
                     .padding(.horizontal, SpotDesign.Spacing.sm)
                 } else if !places.completions.isEmpty {
-                    Text("\(places.completions.count) resultaten")
+                    Text("home.search_results_count \(places.completions.count)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,7 +114,7 @@ struct HomeBottomOverlay: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Zoek bestemming of spot…", text: $places.query)
+            TextField("home.search_placeholder", text: $places.query)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled(true)
                 .focused($isSearchFocused)
@@ -140,7 +140,7 @@ struct HomeBottomOverlay: View {
                 Button {
                     cancelSearch()
                 } label: {
-                    Text("Cancel")
+                    Text("home.cancel")
                         .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(.plain)
@@ -213,11 +213,11 @@ struct HomeBottomOverlay: View {
                     }
                     HStack(spacing: SpotDesign.Spacing.lg) {
                         quickAction(
-                            title: journeys.trackingEnabled ? "Tracking aan" : "Tracking uit",
+                            title: journeys.trackingEnabled ? "home.tracking_on" : "home.tracking_off",
                             systemImage: journeys.trackingEnabled ? "location.fill" : "location.slash",
                             action: onToggleTracking
                         )
-                        quickAction(title: exploreEnabled ? "Explore aan" : "Explore uit", systemImage: "cloud.fill", action: {
+                        quickAction(title: exploreEnabled ? "home.explore_on" : "home.explore_off", systemImage: "cloud.fill", action: {
                             exploreEnabled.toggle()
                         })
                     }
@@ -230,7 +230,7 @@ struct HomeBottomOverlay: View {
         .shadow(radius: SpotDesign.Elevation.shadowPanel)
     }
 
-    private func quickAction(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func quickAction(title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: SpotDesign.Spacing.lg) {
                 Image(systemName: systemImage)
@@ -286,7 +286,7 @@ struct HomeBottomOverlay: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.9))
                     }
-                    Text(nav.destinationName ?? "Bestemming")
+                    Text(nav.destinationName ?? String(localized: "home.destination_fallback"))
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
@@ -303,7 +303,7 @@ struct HomeBottomOverlay: View {
             .buttonStyle(.plain)
             .disabled(nav.route == nil || nav.isCalculating)
 
-            SpotCircleButton(systemImage: "xmark", accessibilityLabel: "Annuleer") {
+            SpotCircleButton(systemImage: "xmark", accessibilityLabel: "home.cancel") {
                 nav.clearAll()
                 cancelSearch()
             }
@@ -339,7 +339,7 @@ struct HomeBottomOverlay: View {
                     .minimumScaleFactor(0.85)
 
                 if nav.distanceToNextManeuverMeters > 0 {
-                    Text("Over \(formatDistance(nav.distanceToNextManeuverMeters))")
+                    Text("home.over_distance \(formatDistance(nav.distanceToNextManeuverMeters))")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -361,25 +361,25 @@ struct HomeBottomOverlay: View {
                 Spacer(minLength: 0)
 
                 if nav.offRouteMeters > 0 {
-                    Text("\(Int(nav.offRouteMeters)) m off-route")
+                    Text("home.off_route_distance \(Int(nav.offRouteMeters))")
                         .font(.caption.weight(.semibold))
                         .padding(.vertical, SpotDesign.Spacing.sm)
                         .padding(.horizontal, SpotDesign.Spacing.lg)
                         .background(SpotDesign.Elevation.controlMaterial, in: Capsule())
                 }
 
-                SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "Stappen") {
+                SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "home.steps") {
                     showingSteps = true
                 }
 
-                SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Recenter") {
+                SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "home.recenter") {
                     nav.requestRecenter()
                 }
 
                 Button(role: .destructive) {
                     nav.clearAll()
                 } label: {
-                    Text("Stop")
+                    Text("home.stop")
                         .font(.subheadline.weight(.semibold))
                         .frame(width: 54, height: 36)
                         .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous))
@@ -397,13 +397,13 @@ struct HomeBottomOverlay: View {
     private var primaryGuidanceDistance: String {
         if nav.remainingDistanceMeters > 0 { return formatDistance(nav.remainingDistanceMeters) }
         if let r = nav.route { return formatDistance(r.distance) }
-        return "—"
+        return String(localized: "home.placeholder_dash")
     }
 
     private var primaryGuidanceTime: String {
         if nav.remainingTimeSeconds > 0 { return formatDuration(nav.remainingTimeSeconds) }
         if let r = nav.route { return formatDuration(r.expectedTravelTime) }
-        return "—"
+        return String(localized: "home.placeholder_dash")
     }
 }
 
@@ -432,7 +432,7 @@ struct HomeMenuSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Vrienden") {
+                Section("home.menu.friends") {
                     HStack {
                         VStack(alignment: .leading, spacing: SpotDesign.Spacing.xs) {
                             Text("Jouw code")
@@ -445,7 +445,7 @@ struct HomeMenuSheet: View {
                         Button {
                             UIPasteboard.general.string = friends.myCode()
                         } label: {
-                            Label("Kopieer", systemImage: "doc.on.doc")
+                            Label("home.menu.copy", systemImage: "doc.on.doc")
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -454,7 +454,7 @@ struct HomeMenuSheet: View {
                     Button {
                         showingAddFriend = true
                     } label: {
-                        Label("Vriend toevoegen", systemImage: "person.badge.plus")
+                        Label("home.menu.add_friend", systemImage: "person.badge.plus")
                     }
 
                     if let err = friends.lastError {
@@ -464,7 +464,7 @@ struct HomeMenuSheet: View {
                     }
 
                     if friends.friends.isEmpty {
-                        Text("Nog geen vrienden. Voeg een code toe.")
+                        Text("home.menu.empty_friends")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
@@ -487,40 +487,40 @@ struct HomeMenuSheet: View {
                                 Button(role: .destructive) {
                                     friends.unfollow(code: f.code)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    Label("home.menu.delete", systemImage: "trash")
                                 }
                             }
                         }
                     }
                 }
 
-                Section("Progress") {
+                Section("home.menu.progress") {
                     let totalKm = explore.totalDistanceKm(from: journeys.journeys)
                     let lvl = explore.level(for: totalKm)
 
                     VStack(alignment: .leading, spacing: SpotDesign.Spacing.lg) {
                         HStack {
-                            Text("Level \(lvl)")
+                            Text("home.menu.level \(lvl)")
                                 .font(.headline)
                             Spacer()
-                            Text(String(format: "%.1f km", totalKm))
+                            Text("home.menu.distance_km \(totalKm)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                         ProgressView(value: explore.progressToNextLevel(for: totalKm))
-                        Text("Progressie naar volgend level")
+                        Text("home.menu.progress_next_level")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, SpotDesign.Spacing.sm)
 
-                    Toggle("Explore-modus op kaart", isOn: $exploreEnabled)
+                    Toggle("home.menu.explore_on_map", isOn: $exploreEnabled)
                 }
 
-                Section("Steden per land") {
+                Section("home.menu.cities_by_country") {
                     let dict = explore.citiesByCountry()
                     if dict.isEmpty {
-                        Text("Nog geen steden/dorpen gelogd. Maak een journey om te beginnen.")
+                        Text("home.menu.empty_cities")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
@@ -535,10 +535,10 @@ struct HomeMenuSheet: View {
                     }
                 }
             }
-            .navigationTitle("Menu")
+            .navigationTitle("home.menu.title")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button("home.done") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -556,19 +556,19 @@ struct HomeMenuSheet: View {
                     .accessibilityAddTraits(.isButton)
                 }
             }
-            .alert("Vriend toevoegen", isPresented: $showingAddFriend) {
-                TextField("Friend code", text: $addFriendCode)
-                Button("Toevoegen") {
+            .alert("home.menu.add_friend", isPresented: $showingAddFriend) {
+                TextField("home.menu.friend_code", text: $addFriendCode)
+                Button("home.menu.add") {
                     friends.follow(code: trimmedAddFriendCode)
                     addFriendCode = ""
                 }
                 .disabled(!isAddFriendCodeValid)
-                Button("Cancel", role: .cancel) { addFriendCode = "" }
+                Button("home.cancel", role: .cancel) { addFriendCode = "" }
             } message: {
                 VStack(alignment: .leading, spacing: SpotDesign.Spacing.sm) {
                     Text("Vraag je vriend om zijn/haar code en plak hem hier.")
                     if !trimmedAddFriendCode.isEmpty && !isAddFriendCodeValid {
-                        Text("Code moet minimaal 6 tekens zijn.")
+                        Text("home.menu.friend_code_minimum")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
