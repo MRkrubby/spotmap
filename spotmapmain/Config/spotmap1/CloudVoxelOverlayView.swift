@@ -288,39 +288,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         }
 
         private func loadPrototype(asset: CloudAsset) -> SCNNode? {
-
-            // CloudAsset rawValue looks like "CloudAssets/StylizedCloud.usdz"
-            let parts = asset.rawValue.split(separator: "/")
-            let file = String(parts.last ?? "")
-            let name = (file as NSString).deletingPathExtension
-            let ext = (file as NSString).pathExtension
-
-            // 1) Preferred: preserve folder reference in bundle.
-            var url: URL? = nil
-            if parts.count >= 2 {
-                let subdir = String(parts.dropLast().joined(separator: "/"))
-                url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: subdir)
-            }
-
-            // 2) Fallback: Xcode often flattens resources when folders are groups (yellow).
-            if url == nil {
-                url = Bundle.main.url(forResource: name, withExtension: ext)
-            }
-
-            // 3) Last resort: search bundle for the file name (case-insensitive).
-            if url == nil, let resourceURL = Bundle.main.resourceURL {
-                let fm = FileManager.default
-                if let e = fm.enumerator(at: resourceURL, includingPropertiesForKeys: nil) {
-                    for case let u as URL in e {
-                        if u.lastPathComponent.lowercased() == (name + "." + ext).lowercased() {
-                            url = u
-                            break
-                        }
-                    }
-                }
-            }
-
-            guard let url else {
+            guard let url = AssetBundleResolver.resolveURL(for: asset.rawValue) else {
                 #if DEBUG
                 print("[CloudVoxelOverlayView] Missing USDZ in bundle: \(asset.rawValue)")
                 #endif
@@ -365,4 +333,3 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         }
     }
 }
-
