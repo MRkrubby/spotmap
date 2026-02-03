@@ -60,8 +60,12 @@ enum AchievementsCatalog {
     static func facts(totalKm: Double, visitedCities: Int, visitedTiles: Int, journeys: [JourneyRecord]) -> [ExploreFact] {
         let longest = journeys.map(\.distanceMeters).max() ?? 0
         let duration = journeys.map(\.duration).reduce(0, +)
-        let weightedSpeedTotal = journeys.reduce(0) { $0 + ($1.avgSpeedMps * $1.duration) }
-        let avgSpeed = duration > 0 ? weightedSpeedTotal / duration : 0
+        let weightedTotals = journeys.reduce(into: (speed: 0.0, weight: 0.0)) { result, journey in
+            let weight = journey.duration > 0 ? journey.duration : journey.distanceMeters
+            result.speed += journey.avgSpeedMps * weight
+            result.weight += weight
+        }
+        let avgSpeed = weightedTotals.weight > 0 ? weightedTotals.speed / weightedTotals.weight : 0
 
         return [
             ExploreFact(
