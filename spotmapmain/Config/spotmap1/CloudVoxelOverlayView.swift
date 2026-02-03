@@ -65,7 +65,6 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         private var prototypes: [CloudAsset: SCNNode] = [:]
 
         private var didConfigure: Bool = false
-        private static let facingYawOffset: Float = .pi / 18
 
         init() {
             scene.rootNode.addChildNode(cloudRoot)
@@ -194,16 +193,6 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
 
             SCNTransaction.commit()
         }
-
-        private static func wrapRadians(_ a: Float) -> Float {
-            var x = a
-            let twoPi: Float = 2 * .pi
-            // Wrap to (-π, +π]
-            x = fmodf(x + .pi, twoPi)
-            if x < 0 { x += twoPi }
-            return x - .pi
-        }
-
 
         private static func centerPivot(_ node: SCNNode) {
             // Ensure rotations don't shift the node in screen-space.
