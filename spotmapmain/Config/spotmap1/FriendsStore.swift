@@ -214,6 +214,10 @@ final class FriendsStore: ObservableObject {
             lastFriendAddWarning = "Code ongeldig. Gebruik 6-10 tekens (A-Z/0-9)."
             return
         }
+        var set = followingCodes()
+        if set.contains(c) {
+            return
+        }
         switch followGate(for: c) {
         case .ok:
             break
@@ -228,7 +232,6 @@ final class FriendsStore: ObservableObject {
             lastFriendAddWarning = "Je kunt jezelf niet toevoegen."
             return
         }
-        var set = followingCodes()
         guard set.count < 120 else {
             lastFriendAddWarning = "Limiet bereikt (120 vrienden)."
             return
