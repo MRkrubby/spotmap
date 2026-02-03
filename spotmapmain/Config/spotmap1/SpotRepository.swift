@@ -153,7 +153,8 @@ final class SpotRepository: ObservableObject {
             id: CKRecord.ID(recordName: LocalSpotService.makeRecordNameIfNeeded(forBackend: backend)),
             title: title,
             note: note,
-            location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude),
+            photoData: photoData
         )
 
         do {
