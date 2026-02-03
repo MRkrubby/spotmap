@@ -230,7 +230,7 @@ final class FriendsStore: ObservableObject {
             lastFriendAddWarning = "Code ongeldig. Gebruik 6-10 tekens (A-Z/0-9)."
             return
         }
-        var set = followingCodes()
+        var set = Set(followingCodes().map { $0.uppercased() })
         if set.contains(c) {
             return
         }
