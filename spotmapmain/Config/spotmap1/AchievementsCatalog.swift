@@ -59,8 +59,9 @@ enum AchievementsCatalog {
 
     static func facts(totalKm: Double, visitedCities: Int, visitedTiles: Int, journeys: [JourneyRecord]) -> [ExploreFact] {
         let longest = journeys.map(\.distanceMeters).max() ?? 0
-        let avgSpeed = journeys.isEmpty ? 0 : journeys.map(\.avgSpeedMps).reduce(0, +) / Double(journeys.count)
         let duration = journeys.map(\.duration).reduce(0, +)
+        let weightedSpeedTotal = journeys.reduce(0) { $0 + ($1.avgSpeedMps * $1.duration) }
+        let avgSpeed = duration > 0 ? weightedSpeedTotal / duration : 0
 
         return [
             ExploreFact(
@@ -79,7 +80,7 @@ enum AchievementsCatalog {
                 id: "avg-speed",
                 title: "Gem. snelheid",
                 value: JourneyFormat.speedKmh(avgSpeed),
-                detail: "Gemiddelde snelheid over alle ritten"
+                detail: "Gewogen gemiddelde snelheid op basis van ritduur"
             ),
             ExploreFact(
                 id: "cities",
