@@ -1,0 +1,10 @@
+distribution_name, file_name, status, issue_cause downloadURL, issue_cause accessURL
+Download dataset in SDMX-CSV format,0-tgs00113,delivered
+Download dataset in SDMX-CSV format,issue,url is invalid
+Download metadata in SDMX 2.1 format,1-tgs00113,delivered
+Download metadata in SDMX 2.1 format,issue,url is invalid
+Download dataset in SDMX 2.1 format,2-tgs00113,delivered
+Download dataset in SDMX 2.1 format,issue,url is invalid
+Table graphs and map visualizations are also available.,3-table,delivered,no download url available
+Download dataset in TSV format,4-tgs00113,delivered
+Download dataset in TSV format,issue,url is invalid

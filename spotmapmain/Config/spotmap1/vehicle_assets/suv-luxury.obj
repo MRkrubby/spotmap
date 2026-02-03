@@ -1,6 +1,6 @@
 # Created by Kenney (www.kenney.nl)
 
-mtllib suv-luxury.mtl
+mtllib vehicle_shared.mtl
 
 g wheel-back-right
 

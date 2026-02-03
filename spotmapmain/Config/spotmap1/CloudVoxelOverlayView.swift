@@ -2,15 +2,13 @@ import SwiftUI
 import SceneKit
 import UIKit
 import simd
+import MapKit
 
-/// A renderable cloud item in view coordinates.
-///
-/// We keep this as screen-space (points) because SwiftUI's `Map` provides
-/// fast coordinate-to-point conversion through `MapProxy`.
+/// A renderable cloud item in world coordinates.
 struct CloudVoxelItem: Identifiable, Hashable {
     let id: UInt64
-    let screenPoint: CGPoint
-    let sizePoints: CGFloat
+    let coordinate: CLLocationCoordinate2D
+    let sizeMeters: Double
     let altitudeMeters: Double
     let asset: CloudAsset
     let seed: UInt64
@@ -22,9 +20,9 @@ struct CloudVoxelItem: Identifiable, Hashable {
 /// and ensures clouds remain true 3D when the map is rotated/pitched.
 struct CloudVoxelOverlayView: UIViewRepresentable {
     let items: [CloudVoxelItem]
-    let headingDegrees: Double
-    let pitchDegrees: Double
     let viewportSize: CGSize
+    let centerCoordinate: CLLocationCoordinate2D
+    let metersPerPoint: Double
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -44,17 +42,18 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
     func updateUIView(_ scnView: SCNView, context: Context) {
         context.coordinator.update(
             items: items,
-            headingDegrees: headingDegrees,
-            pitchDegrees: pitchDegrees,
-            viewportSize: viewportSize
+            viewportSize: viewportSize,
+            centerCoordinate: centerCoordinate,
+            metersPerPoint: metersPerPoint
         )
     }
 
     // MARK: - Coordinator
 
     final class Coordinator {
+        private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "spotmap", category: "CloudVoxelOverlay")
         let scene = SCNScene()
-        private let root = SCNNode()
+        private let cloudRoot = SCNNode()
         private let cameraNode = SCNNode()
         private let lightNode = SCNNode()
 
@@ -65,13 +64,10 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         // We clone these per cloud so we get TRUE 3D from the supplied models.
         private var prototypes: [CloudAsset: SCNNode] = [:]
 
-        // Stable base rotations per cloud id (avoid SCNNode.userData which may be unavailable on some platforms)
-        private var baseRotations: [UInt64: (yaw: Float, x: Float, z: Float)] = [:]
-
         private var didConfigure: Bool = false
 
         init() {
-            scene.rootNode.addChildNode(root)
+            scene.rootNode.addChildNode(cloudRoot)
 
             let cam = SCNCamera()
             cam.usesOrthographicProjection = true
@@ -107,7 +103,12 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             view.pointOfView = cameraNode
         }
 
-        func update(items: [CloudVoxelItem], headingDegrees: Double, pitchDegrees: Double, viewportSize: CGSize) {
+        func update(
+            items: [CloudVoxelItem],
+            viewportSize: CGSize,
+            centerCoordinate: CLLocationCoordinate2D,
+            metersPerPoint: Double
+        ) {
             // Prevent implicit SceneKit animations when we update transforms.
             // Without this, SceneKit may interpolate Euler angles across wrap boundaries (±π)
             // and you can get an unwanted full 360° spin.
@@ -117,27 +118,26 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             // IMPORTANT: the clouds must stay anchored to the map content.
             // If we rotate/tilt the *camera* while positioning clouds in screen-space,
             // the projection changes and the clouds will “swim”/move with the camera.
-            // So we keep the SceneKit camera fixed and instead rotate the *cloud models*
-            // to match the map’s heading/pitch (true 3D parallax without position drift).
-            // Clouds must NOT react to map yaw/pitch (user request).
-            // So we ignore headingDegrees/pitchDegrees entirely here.
-            let _: Float = 0
-            let _: Float = 0
+            // So we keep the SceneKit camera fixed and keep cloud orientation stable.
             cameraNode.eulerAngles = SCNVector3(0, 0, 0)
             if let cam = cameraNode.camera {
                 cam.usesOrthographicProjection = true
-                cam.orthographicScale = Double(max(200.0, viewportSize.height * 0.5))
+                let viewportHeightMeters = Double(viewportSize.height) * max(0.0001, metersPerPoint)
+                cam.orthographicScale = max(200.0, viewportHeightMeters * 0.5)
             }
 
-            // Move origin to center of view.
-            root.position = SCNVector3(-Float(viewportSize.width * 0.5), Float(viewportSize.height * 0.5), 0)
+            // Keep the SceneKit world origin stable; we map map-world deltas into scene units.
+            cloudRoot.position = SCNVector3(0, 0, 0)
+
+            let centerMapPoint = MKMapPoint(centerCoordinate)
+            let metersPerMapPoint = max(0.0001, MKMetersPerMapPointAtLatitude(centerCoordinate.latitude))
+            let sceneUnitsPerMeter = 1.0
 
             // Remove missing.
             let incoming = Set(items.map { $0.id })
             for (id, node) in cloudNodes where !incoming.contains(id) {
                 node.removeFromParentNode()
                 cloudNodes.removeValue(forKey: id)
-                baseRotations.removeValue(forKey: id)
             }
 
             // Update / create.
@@ -148,21 +148,28 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 } else {
                     node = makeAssetCloud(asset: item.asset, seed: item.seed)
                     cloudNodes[item.id] = node
-                    root.addChildNode(node)
+                    cloudRoot.addChildNode(node)
                 }
 
-                // Position in "screen space" SceneKit coordinates.
-                // SceneKit Y axis points up; screen Y points down -> invert by using +y with root offset.
-                let x = Float(item.screenPoint.x)
-                let y = Float(item.screenPoint.y)
+                if node.parent !== cloudRoot {
+                    node.removeFromParentNode()
+                    cloudRoot.addChildNode(node)
+                }
+
+                // Position in map/world space -> SceneKit world space (no screen-space projection).
+                let mapPoint = MKMapPoint(item.coordinate)
+                let dxMeters = (mapPoint.x - centerMapPoint.x) * metersPerMapPoint
+                let dyMeters = (mapPoint.y - centerMapPoint.y) * metersPerMapPoint
+                let x = Float(dxMeters * sceneUnitsPerMeter)
+                let y = Float(dyMeters * sceneUnitsPerMeter)
 
                 // Height: user wants clouds LOWER.
                 // Keep them above buildings when pitched, but not floating too high.
                 // ~200m -> ~45 Scene units.
-                let z = Float(min(24, max(0, item.altitudeMeters * 0.06)))
+                let z = Float(min(24, max(0, item.altitudeMeters * 0.06 * sceneUnitsPerMeter)))
                 node.position = SCNVector3(x, -y, z)
 
-                // Scale: FogCloudField already outputs big sizes (10x).
+                // Scale: use world size (meters) projected into points.
                 // USDZ units vary, so keep a conservative world scale.
                 let scaleBase: Float
                 switch item.asset {
@@ -171,47 +178,21 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 case .tiny:     scaleBase = 0.74
                 }
                 // Bigger overall scaling (user asked: MUCH larger clouds).
-                let s = Float(max(0.10, item.sizePoints / 340.0)) * scaleBase
+                let sizeUnits = item.sizeMeters * sceneUnitsPerMeter
+                let s = Float(max(0.10, sizeUnits / 340.0)) * scaleBase
                 node.scale = SCNVector3(s, s, s)
 
-                // Orientation: base random + map heading/pitch.
-                // Keep a stable base rotation per cloud id to avoid accumulating rotations across updates.
-                let base: (yaw: Float, x: Float, z: Float)
-                if let cached = baseRotations[item.id] {
-                    base = cached
-                } else {
-                    let baseYaw = Float((Double(item.seed & 0xFFFF) / 65535.0) * 2.0 * .pi)
-                    let baseX = Float((Double((item.seed >> 16) & 0xFFFF) / 65535.0 - 0.5) * 0.18)
-                    let baseZ = Float((Double((item.seed >> 32) & 0xFFFF) / 65535.0 - 0.5) * 0.18)
-                    base = (yaw: baseYaw, x: baseX, z: baseZ)
-                    baseRotations[item.id] = base
-                }
+                // Orientation: deterministic, seed-only yaw (no camera-driven pitch/roll).
+                let baseYaw = Float((Double(item.seed & 0xFFFF) / 65535.0) * 2.0 * .pi)
 
-                // Map effects:
-                // - heading: yaw around Y
-                // - pitch: tilt around X
-                // Use quaternions to avoid Euler wrap artifacts.
-                let yaw: Float = Self.wrapRadians(base.yaw)
-                let tilt: Float = base.x
-
+                // Fixed yaw offset to keep a subtle, consistent facing adjustment.
+                let yaw: Float = Self.wrapRadians(baseYaw + Self.facingYawOffset)
                 let qYaw: simd_quatf = simd_quatf(angle: yaw, axis: SIMD3<Float>(0, 1, 0))
-                let qPitch: simd_quatf = simd_quatf(angle: tilt, axis: SIMD3<Float>(1, 0, 0))
-                let qRoll: simd_quatf = simd_quatf(angle: base.z, axis: SIMD3<Float>(0, 0, 1))
-                node.simdOrientation = qYaw * qPitch * qRoll
+                node.simdOrientation = qYaw
             }
 
             SCNTransaction.commit()
         }
-
-        private static func wrapRadians(_ a: Float) -> Float {
-            var x = a
-            let twoPi: Float = 2 * .pi
-            // Wrap to (-π, +π]
-            x = fmodf(x + .pi, twoPi)
-            if x < 0 { x += twoPi }
-            return x - .pi
-        }
-
 
         private static func centerPivot(_ node: SCNNode) {
             // Ensure rotations don't shift the node in screen-space.
@@ -230,13 +211,14 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             if let cached = prototypes[asset] {
                 proto = cached
             } else {
-                proto = loadPrototype(asset: asset) ?? Self.makeFallbackVoxelCloud()
+                proto = loadPrototype(asset: asset)
                 prototypes[asset] = proto
             }
 
             // Clone to keep per-cloud transforms independent.
             // Flattened clone is cheaper to render than a deep graph.
             let node = proto.flattenedClone()
+            Self.enforceYAxisBillboards(node)
             Self.centerPivot(node)
 
             // Ensure we keep alpha if the model uses it.
@@ -252,6 +234,25 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             }
 
             return node
+        }
+
+        private static func enforceYAxisBillboards(_ node: SCNNode) {
+            if let constraints = node.constraints {
+                for constraint in constraints {
+                    if let billboard = constraint as? SCNBillboardConstraint {
+                        billboard.freeAxes = [.Y]
+                    }
+                }
+            }
+            node.enumerateChildNodes { child, _ in
+                if let constraints = child.constraints {
+                    for constraint in constraints {
+                        if let billboard = constraint as? SCNBillboardConstraint {
+                            billboard.freeAxes = [.Y]
+                        }
+                    }
+                }
+            }
         }
 
         private static func makeFallbackVoxelCloud() -> SCNNode {
@@ -279,72 +280,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 n.position = SCNVector3(x * 70, y * 60, z * 40)
                 container.addChildNode(n)
             }
-
-            // Center pivot.
-            let (minV, maxV) = container.boundingBox
-            let center = SCNVector3((minV.x + maxV.x) * 0.5, (minV.y + maxV.y) * 0.5, (minV.z + maxV.z) * 0.5)
-            container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
-            return container
-        }
-
-        private func loadPrototype(asset: CloudAsset) -> SCNNode? {
-
-            // CloudAsset rawValue looks like "CloudAssets/StylizedCloud.usdz"
-            let parts = asset.rawValue.split(separator: "/")
-            let file = String(parts.last ?? "")
-            let name = (file as NSString).deletingPathExtension
-            let ext = (file as NSString).pathExtension
-
-            // 1) Preferred: preserve folder reference in bundle.
-            var url: URL? = nil
-            if parts.count >= 2 {
-                let subdir = String(parts.dropLast().joined(separator: "/"))
-                url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: subdir)
-            }
-
-            // 2) Fallback: Xcode often flattens resources when folders are groups (yellow).
-            if url == nil {
-                url = Bundle.main.url(forResource: name, withExtension: ext)
-            }
-
-            // 3) Last resort: search bundle for the file name (case-insensitive).
-            if url == nil, let resourceURL = Bundle.main.resourceURL {
-                let fm = FileManager.default
-                if let e = fm.enumerator(at: resourceURL, includingPropertiesForKeys: nil) {
-                    for case let u as URL in e {
-                        if u.lastPathComponent.lowercased() == (name + "." + ext).lowercased() {
-                            url = u
-                            break
-                        }
-                    }
-                }
-            }
-
-            guard let url else {
-                #if DEBUG
-                print("[CloudVoxelOverlayView] Missing USDZ in bundle: \(asset.rawValue)")
-                #endif
-                return nil
-            }
-
-            // Load USDZ into SceneKit.
-            guard let ref = SCNReferenceNode(url: url) else { return nil }
-            ref.load()
-
-            // Normalize pivot to its bounding box center so scaling/rotation behaves nicely.
-            let container = SCNNode()
-            container.addChildNode(ref)
-
-            // Center pivot for consistent placement.
-            let (minV, maxV) = container.boundingBox
-            let center = SCNVector3(
-                (minV.x + maxV.x) * 0.5,
-                (minV.y + maxV.y) * 0.5,
-                (minV.z + maxV.z) * 0.5
-            )
-            container.pivot = SCNMatrix4MakeTranslation(center.x, center.y, center.z)
-
-            return container
+            return node
         }
 
         // MARK: - Tiny RNG
@@ -365,4 +301,3 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         }
     }
 }
-

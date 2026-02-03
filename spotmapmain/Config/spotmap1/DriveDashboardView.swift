@@ -13,7 +13,7 @@ struct DriveDashboardView: View {
     @State private var mapPosition: MapCameraPosition = .automatic
     @State private var showingJourneys = false
     @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
-    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "suv"
 
     var body: some View {
         ZStack {
@@ -182,4 +182,3 @@ struct DriveDashboardView: View {
         .shadow(radius: 6)
     }
 }
-

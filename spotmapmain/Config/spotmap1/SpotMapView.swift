@@ -15,6 +15,8 @@ struct SpotMapView: View {
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var friends: FriendsStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var vm: SpotMapViewModel
     @StateObject private var mapCoordinator = SpotMapCoordinator(fog: FogOfWarStore.shared)
     
@@ -33,6 +35,23 @@ struct SpotMapView: View {
     init() {
         let repo = SpotRepository()
         _vm = StateObject(wrappedValue: SpotMapViewModel(repo: repo))
+    }
+
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var headerHorizontalPadding: CGFloat {
+        if isCompactHeight { return 8 }
+        return isRegularWidth ? 20 : 12
+    }
+
+    private var headerTopPadding: CGFloat {
+        isCompactHeight ? 4 : 10
     }
     
     var body: some View {
@@ -64,19 +83,19 @@ struct SpotMapView: View {
                             onOpenSettings: { showingSettings = true },
                             onFocusUser: { vm.focusOnUser() }
                         )
-                            .padding(.top, 10)
-                            .padding(.horizontal, 12)
+                            .padding(.top, headerTopPadding)
+                            .padding(.horizontal, headerHorizontalPadding)
                         
                         if vm.repo.isLoading {
                             SpotLoadingPill(text: vm.repo.spots.isEmpty ? "Laden…" : "Bijwerken…")
-                                .padding(.horizontal, 12)
+                                .padding(.horizontal, headerHorizontalPadding)
                         }
                         
                         if journeys.isRecording {
                             SpotLoadingPill(
-                                text: "REC • \(JourneyFormat.km(journeys.currentDistanceMeters)) • \(JourneyFormat.speedKmh(journeys.currentSpeedMps))"
+                                text: "spotmap.recording_status \(JourneyFormat.km(journeys.currentDistanceMeters)) \(JourneyFormat.speedKmh(journeys.currentSpeedMps))"
                             )
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, headerHorizontalPadding)
                         }
                     }
                     
@@ -90,19 +109,24 @@ struct SpotMapView: View {
             // - route preview
             // - navigation HUD
             .safeAreaInset(edge: .bottom) {
-                SpotMapOverlays(
-                    vm: vm,
-                    onOpenSpots: { showingSpotsList = true },
-                    onAddSpot: { vm.showingAdd = true },
-                    onOpenJourneys: { showingJourneysSheet = true },
-                    onOpenSettings: { showingSettings = true },
-                    onToggleTracking: { journeys.toggle() }
-                )
+                HStack {
+                    if isCompactHeight { Spacer() }
+                    SpotMapOverlays(
+                        vm: vm,
+                        onOpenSpots: { showingSpotsList = true },
+                        onAddSpot: { vm.showingAdd = true },
+                        onOpenJourneys: { showingJourneysSheet = true },
+                        onOpenSettings: { showingSettings = true },
+                        onToggleTracking: { journeys.toggle() }
+                    )
+                    .frame(maxWidth: isCompactHeight && !isRegularWidth ? 420 : .infinity, alignment: .trailing)
+                }
+                .padding(.horizontal, isCompactHeight ? 12 : 0)
             }
             
             // Errors
             .alert(
-                "Melding",
+                "spotmap.alert_title",
                 isPresented: Binding(
                     get: { vm.repo.lastErrorMessage != nil },
                     set: { newValue in
@@ -110,7 +134,7 @@ struct SpotMapView: View {
                     }
                 ),
                 actions: {
-                    Button("OK", role: .cancel) { vm.repo.lastErrorMessage = nil }
+                    Button("spotmap.ok", role: .cancel) { vm.repo.lastErrorMessage = nil }
                 },
                 message: {
                     Text(vm.repo.lastErrorMessage ?? "")
@@ -292,14 +316,14 @@ struct SpotMapView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack(alignment: .firstTextBaseline) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Level \(level)")
+                                    Text("spotmap.achievements.level \(level)")
                                         .font(.title2.bold())
-                                    Text("Totaal gereden")
+                                    Text("spotmap.achievements.total_driven")
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(String(format: "%.1f km", totalKm))
+                                Text("spotmap.achievements.distance_km \(totalKm)")
                                     .font(.headline)
                             }
                             
@@ -307,7 +331,7 @@ struct SpotMapView: View {
                                 .tint(.blue)
                             
                             let next = Double(level) * 100.0
-                            Text("Nog \(max(0.0, next - totalKm), specifier: "%.0f") km tot level \(level + 1)")
+                            Text("spotmap.achievements.next_level_distance \(max(0.0, next - totalKm)) \(level + 1)")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -357,13 +381,13 @@ struct SpotMapView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Image(systemName: "square.3.layers.3d")
-                                Text("Achievement kaart")
+                                Text("spotmap.achievements.map_layer")
                                     .font(.headline)
                                 Spacer()
                                 Toggle("", isOn: $exploreEnabled)
                                     .labelsHidden()
                             }
-                            Text("Zet deze laag aan om je vrijgespeelde gebieden op de kaart te zien.")
+                            Text("spotmap.achievements.map_layer_help")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -400,15 +424,15 @@ struct SpotMapView: View {
                         
                         // Stats
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Voortgang")
+                            Text("spotmap.achievements.progress")
                                 .font(.headline)
                             
                             HStack {
-                                StatPill(title: "Tegels", value: "\(explore.visitedTiles.count)", systemImage: "square.grid.3x3")
-                                StatPill(title: "Steden", value: "\(explore.visitedCities.count)", systemImage: "building.2")
+                                StatPill(title: "spotmap.achievements.tiles", value: "\(explore.visitedTiles.count)", systemImage: "square.grid.3x3")
+                                StatPill(title: "spotmap.achievements.cities", value: "\(explore.visitedCities.count)", systemImage: "building.2")
                             }
                             
-                            Text("Elke journey kleurt nieuwe kaart-tegels in. Steden/dorpen worden bepaald op basis van start- en eindpunt.")
+                            Text("spotmap.achievements.progress_help")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -419,14 +443,14 @@ struct SpotMapView: View {
                         // Countries
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Text("Steden per land")
+                                Text("spotmap.achievements.cities_by_country")
                                     .font(.headline)
                                 Spacer()
                             }
                             
                             let dict = explore.citiesByCountry()
                             if dict.isEmpty {
-                                Text("Nog geen steden/dorpen ontdekt. Maak een journey om te beginnen.")
+                                Text("spotmap.achievements.empty_cities")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             } else {
@@ -475,25 +499,26 @@ struct SpotMapView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 14)
                 }
-                .navigationTitle("Achievements")
+                .navigationTitle("spotmap.achievements.title")
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") { dismiss() }
+                        Button("spotmap.done") { dismiss() }
                     }
                 }
             }
         }
     }
     
-    private struct StatPill: View {
-        let title: String
+private struct StatPill: View {
+        let title: LocalizedStringKey
         let value: String
         let systemImage: String
+        @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 16
         
         var body: some View {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: iconSize, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.caption)
@@ -525,6 +550,7 @@ private struct SpotMapHeader: View {
     let onRefresh: () -> Void
     let onOpenSettings: () -> Void
     let onFocusUser: () -> Void
+    @ScaledMetric(relativeTo: .body) private var menuIconSize: CGFloat = 15
 
     var body: some View {
         HStack(spacing: 12) {
@@ -537,7 +563,7 @@ private struct SpotMapHeader: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("SpotMap")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.headline.weight(.bold))
                     Text(vm.repo.backend.title)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -546,14 +572,14 @@ private struct SpotMapHeader: View {
 
             Spacer(minLength: 0)
 
-            SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "Naar mijn locatie") {
+            SpotCircleButton(systemImage: "location.fill", accessibilityLabel: "spotmap.location_accessibility") {
                 onFocusUser()
             }
 
             // Quick toggle: Achievement map layer (Explore)
             SpotCircleButton(
                 systemImage: exploreEnabled ? "square.3.layers.3d.down.right" : "square.3.layers.3d",
-                accessibilityLabel: "Achievement kaartlaag"
+                accessibilityLabel: "spotmap.achievements.map_layer_accessibility"
             ) {
                 let gen = UIImpactFeedbackGenerator(style: .light)
                 gen.impactOccurred()
@@ -564,24 +590,24 @@ private struct SpotMapHeader: View {
 
             Menu {
                 Button(action: onOpenSpots) {
-                    Label("Spots", systemImage: "list.bullet")
+                    Label("spotmap.action_spots", systemImage: "list.bullet")
                 }
 
                 Button(action: onAddSpot) {
-                    Label("Nieuwe spot", systemImage: "mappin.and.ellipse")
+                    Label("spotmap.action_new_spot", systemImage: "mappin.and.ellipse")
                 }
 
                 Button(action: onOpenJourneys) {
-                    Label("Journeys", systemImage: "car")
+                    Label("spotmap.action_journeys", systemImage: "car")
                 }
 
                 Button(action: onOpenAchievements) {
-                    Label("Achievements", systemImage: "trophy")
+                    Label("spotmap.action_achievements", systemImage: "trophy")
                 }
 
                 Button(action: onToggleTracking) {
                     Label(
-                        journeys.trackingEnabled ? "Tracking uit" : "Tracking aan",
+                        journeys.trackingEnabled ? "spotmap.tracking_off" : "spotmap.tracking_on",
                         systemImage: journeys.trackingEnabled ? "location.slash" : "location.fill"
                     )
                 }
@@ -589,11 +615,11 @@ private struct SpotMapHeader: View {
                 Divider()
 
                 Button(action: onRefresh) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                    Label("spotmap.refresh", systemImage: "arrow.clockwise")
                 }
 
                 Button(action: onOpenSettings) {
-                    Label("Instellingen", systemImage: "gearshape")
+                    Label("spotmap.settings", systemImage: "gearshape")
                 }
             } label: {
                 ZStack {
@@ -603,10 +629,10 @@ private struct SpotMapHeader: View {
                         .frame(width: SpotBrand.circleButtonSize, height: SpotBrand.circleButtonSize)
                         .shadow(radius: 6)
                     Image(systemName: "ellipsis")
-                        .font(.system(size: SpotBrand.iconSize, weight: .semibold))
+                        .font(.system(size: menuIconSize, weight: .semibold))
                 }
             }
-            .accessibilityLabel("Menu")
+            .accessibilityLabel(Text("spotmap.menu_accessibility"))
         }
         .padding(10)
         .background(.ultraThinMaterial)
@@ -652,7 +678,7 @@ private struct SpotMapMapLayer: View {
     @ObservedObject var coordinator: SpotMapCoordinator
     @ObservedObject var fogCloudField: FogCloudField
     @AppStorage("UserLocation.style") private var userLocationStyleRaw: String = UserLocationStyle.system.rawValue
-    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "personal-sedan"
+    @AppStorage("UserLocation.assetId") private var userLocationAssetId: String = "suv"
 
     var body: some View {
         let style = UserLocationStyle.from(rawValue: userLocationStyleRaw)
@@ -700,7 +726,7 @@ private struct SpotMapMapLayer: View {
                         // to keep taps and scrolling responsive.
 
                         if let dest = nav.destination?.placemark.coordinate {
-                            Marker(nav.destinationName ?? "Bestemming", coordinate: dest)
+                            Marker(nav.destinationName ?? String(localized: "spotmap.destination_fallback"), coordinate: dest)
                         }
 
                         ForEach(vm.repo.spots) { spot in
@@ -756,20 +782,15 @@ private struct SpotMapMapLayer: View {
                 // TRUE 3D clouds overlay.
                 // Only render when Explore is enabled.
                 if exploreEnabled {
-                    // Convert cloud world coordinates to screen-space points.
-                    // We keep clouds pinned to the map content (screen-space) and render them as true 3D
-                    // in a transparent SceneKit overlay.
-                    //
-                    // IMPORTANT:
-                    // Keep clouds world-anchored so they stay fixed relative to map content while
-                    // the camera moves around them. `MapProxy.convert` already accounts for the
-                    // current camera heading/pitch, so we keep the projected points as-is.
-                    let items: [CloudVoxelItem] = fogCloudField.clouds.compactMap { (cloud) -> CloudVoxelItem? in
-                        guard let pt = proxy.convert(cloud.coordinate, to: .local) else { return nil }
-                        return CloudVoxelItem(
+                    // Convert cloud world coordinates into deterministic map points.
+                    // The SceneKit overlay projects those world positions into view space using
+                    // the current center + meters-per-point so camera motion doesn't re-seed
+                    // or re-place clouds (only LOD/visibility changes with viewport).
+                    let items: [CloudVoxelItem] = fogCloudField.clouds.map { cloud in
+                        CloudVoxelItem(
                             id: cloud.id,
-                            screenPoint: pt,
-                            sizePoints: cloud.sizePoints,
+                            coordinate: cloud.coordinate,
+                            sizeMeters: cloud.sizeMeters,
                             altitudeMeters: cloud.altitudeMeters,
                             asset: cloud.asset,
                             seed: cloud.seed
@@ -778,10 +799,9 @@ private struct SpotMapMapLayer: View {
 
                     CloudVoxelOverlayView(
                         items: items,
-                        // Keep cloud assets independent from map rotation/tilt.
-                        headingDegrees: 0,
-                        pitchDegrees: 0,
-                        viewportSize: geo.size
+                        viewportSize: geo.size,
+                        centerCoordinate: fogCloudField.centerCoordinateNow,
+                        metersPerPoint: fogCloudField.metersPerPointNow
                     )
                     .frame(width: geo.size.width, height: geo.size.height)
                     .allowsHitTesting(false)

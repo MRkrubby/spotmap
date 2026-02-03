@@ -45,7 +45,7 @@ struct AddSpotView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Plaats de pin op de juiste locatie")
+                        Text("addspot.place_pin_help")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 
@@ -58,7 +58,7 @@ struct AddSpotView: View {
                                 // jump pin to current visible center
                                 selectedCoordinate = mapRegion.center
                             } label: {
-                                Label("Gebruik kaartcentrum", systemImage: "mappin.and.ellipse")
+                                Label("addspot.use_map_center", systemImage: "mappin.and.ellipse")
                             }
 
                             Spacer()
@@ -67,38 +67,38 @@ struct AddSpotView: View {
                                 // recenter map on the pin
                                 mapRegion.center = selectedCoordinate
                             } label: {
-                                Label("Recenter", systemImage: "location")
+                                Label("addspot.recenter", systemImage: "location")
                             }
                         }
                         .font(.subheadline)
 
-                        Text("Lat: \(String(format: "%.6f", selectedCoordinate.latitude))  •  Lon: \(String(format: "%.6f", selectedCoordinate.longitude))")
+                        Text("addspot.coordinates \(String(format: "%.6f", selectedCoordinate.latitude)) \(String(format: "%.6f", selectedCoordinate.longitude))")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Locatie")
+                    Text("addspot.section_location")
                 }
 
-                Section("Spot") {
-                    TextField("Naam", text: $title)
+                Section("addspot.section_spot") {
+                    TextField("addspot.name", text: $title)
                         .textInputAutocapitalization(.words)
 
-                    TextField("Notitie", text: $note, axis: .vertical)
+                    TextField("addspot.note", text: $note, axis: .vertical)
                         .lineLimit(3...6)
                 }
 
-                Section("Foto") {
+                Section("addspot.section_photo") {
                     HStack(spacing: 12) {
                         PhotosPicker(selection: $pickedItem, matching: .images) {
-                            Label("Kies foto", systemImage: "photo")
+                            Label("addspot.choose_photo", systemImage: "photo")
                         }
                         .buttonStyle(.bordered)
 
                         Button {
                             showCamera = true
                         } label: {
-                            Label("Maak foto", systemImage: "camera")
+                            Label("addspot.take_photo", systemImage: "camera")
                         }
                         .buttonStyle(.bordered)
                     }
@@ -114,9 +114,9 @@ struct AddSpotView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.12)))
 
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Foto toegevoegd")
+                                Text("addspot.photo_added")
                                     .font(.subheadline.weight(.semibold))
-                                Text("Je kunt de foto later aanpassen via Spot-detail (volgende stap).")
+                                Text("addspot.photo_added_help")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 
@@ -124,25 +124,25 @@ struct AddSpotView: View {
                                     self.photoData = nil
                                     self.pickedItem = nil
                                 } label: {
-                                    Label("Verwijder foto", systemImage: "trash")
+                                    Label("addspot.remove_photo", systemImage: "trash")
                                 }
                                 .font(.caption)
                             }
                         }
                     } else {
-                        Text("Optioneel: voeg een foto toe aan je spot.")
+                        Text("addspot.photo_optional")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
-            .navigationTitle("Nieuwe spot")
+            .navigationTitle("addspot.title")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuleer") { dismiss() }
+                    Button("addspot.cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Opslaan") {
+                    Button("addspot.save") {
                         onAdd(clean(title), clean(note), selectedCoordinate, photoData)
                         dismiss()
                     }
@@ -285,4 +285,3 @@ struct CameraPicker: UIViewControllerRepresentable {
         }
     }
 }
-
