@@ -637,9 +637,6 @@ private struct SpotMapMapLayer: View {
 
                     CloudVoxelOverlayView(
                         items: items,
-                        // Keep cloud assets independent from map rotation/tilt.
-                        headingDegrees: 0,
-                        pitchDegrees: 0,
                         viewportSize: geo.size
                     )
                     .frame(width: geo.size.width, height: geo.size.height)
