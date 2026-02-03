@@ -62,9 +62,6 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         // We clone these per cloud so we get TRUE 3D from the supplied models.
         private var prototypes: [CloudAsset: SCNNode] = [:]
 
-        // Stable base yaw per cloud id (avoid SCNNode.userData which may be unavailable on some platforms)
-        private var baseYawRotations: [UInt64: Float] = [:]
-
         private var didConfigure: Bool = false
         private static let facingYawOffset: Float = .pi / 18
 
@@ -134,7 +131,6 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             for (id, node) in cloudNodes where !incoming.contains(id) {
                 node.removeFromParentNode()
                 cloudNodes.removeValue(forKey: id)
-                baseYawRotations.removeValue(forKey: id)
             }
 
             // Update / create.
@@ -182,16 +178,8 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 let s = Float(max(0.10, sizePoints / 340.0)) * scaleBase
                 node.scale = SCNVector3(s, s, s)
 
-                // Orientation: base random yaw only (no camera-driven pitch/roll).
-                // Keep a stable base rotation per cloud id to avoid accumulating rotations across updates.
-                let baseYaw: Float
-                if let cached = baseYawRotations[item.id] {
-                    baseYaw = cached
-                } else {
-                    let yaw = Float((Double(item.seed & 0xFFFF) / 65535.0) * 2.0 * .pi)
-                    baseYaw = yaw
-                    baseYawRotations[item.id] = yaw
-                }
+                // Orientation: deterministic, seed-only yaw (no camera-driven pitch/roll).
+                let baseYaw = Float((Double(item.seed & 0xFFFF) / 65535.0) * 2.0 * .pi)
 
                 // Fixed yaw offset to keep a subtle, consistent facing adjustment.
                 let yaw: Float = Self.wrapRadians(baseYaw + Self.facingYawOffset)
