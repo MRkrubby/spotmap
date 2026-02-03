@@ -14,6 +14,8 @@ struct HomeBottomOverlay: View {
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var friends: FriendsStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @ObservedObject var repo: SpotRepository
     @ObservedObject private var explore = ExploreStore.shared
@@ -31,8 +33,29 @@ struct HomeBottomOverlay: View {
     @State private var showingSteps = false
     @State private var showingHomeMenu = false
 
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var overlaySpacing: CGFloat {
+        isCompactHeight ? 6 : 10
+    }
+
+    private var cardPadding: CGFloat {
+        isCompactHeight ? 10 : 12
+    }
+
+    private var horizontalInset: CGFloat {
+        if isCompactHeight { return 10 }
+        return isRegularWidth ? 18 : 14
+    }
+
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: overlaySpacing) {
             if nav.isNavigating {
                 guidanceUI
             } else if nav.isPreviewing {
@@ -129,8 +152,8 @@ struct HomeBottomOverlay: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
+        .padding(.vertical, isCompactHeight ? 8 : 12)
+        .padding(.horizontal, horizontalInset)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.10)))
     }
@@ -188,7 +211,7 @@ struct HomeBottomOverlay: View {
                         })
                     }
                 }
-                .padding(14)
+                .padding(isCompactHeight ? 10 : 14)
             }
         }
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -206,8 +229,8 @@ struct HomeBottomOverlay: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
+            .padding(.vertical, isCompactHeight ? 8 : 12)
+            .padding(.horizontal, horizontalInset)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
         }
@@ -273,7 +296,7 @@ struct HomeBottomOverlay: View {
                 cancelSearch()
             }
         }
-        .padding(12)
+        .padding(cardPadding)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
         .shadow(radius: 12)
@@ -296,7 +319,7 @@ struct HomeBottomOverlay: View {
     // MARK: - Guidance
 
     private var guidanceUI: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: overlaySpacing) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(nav.instruction.isEmpty ? (nav.destinationName ?? "Route") : nav.instruction)
                     .font(.system(size: 16, weight: .bold))
@@ -309,7 +332,7 @@ struct HomeBottomOverlay: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .padding(cardPadding)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.10)))
 
@@ -351,7 +374,7 @@ struct HomeBottomOverlay: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(12)
+            .padding(cardPadding)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
             .shadow(radius: 12)

@@ -15,6 +15,8 @@ struct SpotMapView: View {
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var nav: NavigationManager
     @EnvironmentObject private var friends: FriendsStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var vm: SpotMapViewModel
     @StateObject private var mapCoordinator = SpotMapCoordinator(fog: FogOfWarStore.shared)
     
@@ -33,6 +35,23 @@ struct SpotMapView: View {
     init() {
         let repo = SpotRepository()
         _vm = StateObject(wrappedValue: SpotMapViewModel(repo: repo))
+    }
+
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var headerHorizontalPadding: CGFloat {
+        if isCompactHeight { return 8 }
+        return isRegularWidth ? 20 : 12
+    }
+
+    private var headerTopPadding: CGFloat {
+        isCompactHeight ? 4 : 10
     }
     
     var body: some View {
@@ -64,19 +83,19 @@ struct SpotMapView: View {
                             onOpenSettings: { showingSettings = true },
                             onFocusUser: { vm.focusOnUser() }
                         )
-                            .padding(.top, 10)
-                            .padding(.horizontal, 12)
+                            .padding(.top, headerTopPadding)
+                            .padding(.horizontal, headerHorizontalPadding)
                         
                         if vm.repo.isLoading {
                             SpotLoadingPill(text: vm.repo.spots.isEmpty ? "Laden…" : "Bijwerken…")
-                                .padding(.horizontal, 12)
+                                .padding(.horizontal, headerHorizontalPadding)
                         }
                         
                         if journeys.isRecording {
                             SpotLoadingPill(
                                 text: "REC • \(JourneyFormat.km(journeys.currentDistanceMeters)) • \(JourneyFormat.speedKmh(journeys.currentSpeedMps))"
                             )
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, headerHorizontalPadding)
                         }
                     }
                     
@@ -90,14 +109,19 @@ struct SpotMapView: View {
             // - route preview
             // - navigation HUD
             .safeAreaInset(edge: .bottom) {
-                SpotMapOverlays(
-                    vm: vm,
-                    onOpenSpots: { showingSpotsList = true },
-                    onAddSpot: { vm.showingAdd = true },
-                    onOpenJourneys: { showingJourneysSheet = true },
-                    onOpenSettings: { showingSettings = true },
-                    onToggleTracking: { journeys.toggle() }
-                )
+                HStack {
+                    if isCompactHeight { Spacer() }
+                    SpotMapOverlays(
+                        vm: vm,
+                        onOpenSpots: { showingSpotsList = true },
+                        onAddSpot: { vm.showingAdd = true },
+                        onOpenJourneys: { showingJourneysSheet = true },
+                        onOpenSettings: { showingSettings = true },
+                        onToggleTracking: { journeys.toggle() }
+                    )
+                    .frame(maxWidth: isCompactHeight && !isRegularWidth ? 420 : .infinity, alignment: .trailing)
+                }
+                .padding(.horizontal, isCompactHeight ? 12 : 0)
             }
             
             // Errors
