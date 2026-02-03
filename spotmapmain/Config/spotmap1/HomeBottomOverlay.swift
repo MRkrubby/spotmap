@@ -104,8 +104,13 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Wis zoekopdracht")
+                .accessibilityAddTraits(.isButton)
             }
 
             if isSearchFocused || !places.query.isEmpty {
@@ -124,9 +129,13 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 2)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open menu")
+                .accessibilityAddTraits(.isButton)
             }
         }
         .padding(.vertical, 12)
@@ -513,6 +522,11 @@ struct HomeMenuSheet: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .padding(6)
+                    .contentShape(Rectangle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("Vernieuwen")
+                    .accessibilityAddTraits(.isButton)
                 }
             }
             .alert("Vriend toevoegen", isPresented: $showingAddFriend) {
