@@ -155,6 +155,8 @@ final class FriendsStore: ObservableObject {
     @Published var lastError: String? = nil
     @Published var lastFriendAddWarning: String? = nil
 
+    static let liveJourneyMaxAge: TimeInterval = 3 * 60
+
     private let meKey = "Friends.me.v1"
     private let followingKey = "Friends.following.v1"
     private let abuseKey = "Friends.abuse.v1"
@@ -197,6 +199,14 @@ final class FriendsStore: ObservableObject {
         loadLastJourneyZlib()
         loadLiveJourneyZlib()
         loadFollowing()
+    }
+
+    func liveJourneyZlib(for friend: FriendProfile, referenceDate: Date = Date()) -> Data? {
+        guard let updatedAt = friend.updatedAt,
+              referenceDate.timeIntervalSince(updatedAt) <= Self.liveJourneyMaxAge else {
+            return nil
+        }
+        return friend.liveJourneyZlib
     }
 
     func setDisplayName(_ name: String) {
