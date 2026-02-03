@@ -32,7 +32,7 @@ struct HomeBottomOverlay: View {
     @State private var showingHomeMenu = false
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: SpotDesign.Spacing.lg) {
             if nav.isNavigating {
                 guidanceUI
             } else if nav.isPreviewing {
@@ -60,25 +60,25 @@ struct HomeBottomOverlay: View {
     // MARK: - Search
 
     private var searchUI: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: SpotDesign.Spacing.md) {
             searchBar
 
             if isSearchFocused || !places.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 if places.isSearching {
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
                         ProgressView()
                         Text("Zoeken…")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, SpotDesign.Spacing.sm)
                 } else if !places.completions.isEmpty {
                     Text("\(places.completions.count) resultaten")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, SpotDesign.Spacing.sm)
                 }
 
                 resultsPanel
@@ -87,7 +87,7 @@ struct HomeBottomOverlay: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpotDesign.Spacing.lg) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
@@ -124,27 +124,27 @@ struct HomeBottomOverlay: View {
                 } label: {
                     Image(systemName: "line.3.horizontal")
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 2)
+                        .padding(.leading, SpotDesign.Spacing.xxs)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.10)))
+        .padding(.vertical, SpotDesign.Spacing.xl)
+        .padding(.horizontal, SpotDesign.Spacing.xxl)
+        .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.input, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.input, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
     }
 
     private var resultsPanel: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: SpotDesign.Spacing.none) {
             // Destinations
             if !places.completions.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.md) {
                     ForEach(places.completions, id: \.self) { c in
                         Button {
                             selectCompletion(c)
                         } label: {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                                 Text(c.title)
                                     .font(.body.weight(.semibold))
                                     .lineLimit(1)
@@ -156,8 +156,8 @@ struct HomeBottomOverlay: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 14)
+                            .padding(.vertical, SpotDesign.Spacing.lg)
+                            .padding(.horizontal, SpotDesign.Spacing.xxl)
                         }
                         .buttonStyle(.plain)
 
@@ -168,16 +168,16 @@ struct HomeBottomOverlay: View {
 
             // Quick actions (only when not typing / no results)
             if places.completions.isEmpty {
-                VStack(spacing: 10) {
-                    HStack(spacing: 10) {
+                VStack(spacing: SpotDesign.Spacing.lg) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
                         quickAction(title: "Spots", systemImage: "list.bullet", action: onOpenSpots)
                         quickAction(title: "Nieuwe spot", systemImage: "mappin.and.ellipse", action: onAddSpot)
                     }
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
                         quickAction(title: "Journeys", systemImage: "car", action: onOpenJourneys)
                         quickAction(title: "Instellingen", systemImage: "gearshape", action: onOpenSettings)
                     }
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpotDesign.Spacing.lg) {
                         quickAction(
                             title: journeys.trackingEnabled ? "Tracking aan" : "Tracking uit",
                             systemImage: journeys.trackingEnabled ? "location.fill" : "location.slash",
@@ -188,17 +188,17 @@ struct HomeBottomOverlay: View {
                         })
                     }
                 }
-                .padding(14)
+                .padding(SpotDesign.Spacing.xxl)
             }
         }
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.10)))
-        .shadow(radius: 10)
+        .background(SpotDesign.Elevation.controlMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowPanel)
     }
 
     private func quickAction(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
                 Image(systemName: systemImage)
                     .font(.subheadline.weight(.semibold))
                     .frame(width: 22)
@@ -206,10 +206,10 @@ struct HomeBottomOverlay: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
+            .padding(.vertical, SpotDesign.Spacing.xl)
+            .padding(.horizontal, SpotDesign.Spacing.xxl)
+            .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
         }
         .buttonStyle(.plain)
     }
@@ -234,7 +234,7 @@ struct HomeBottomOverlay: View {
     // MARK: - Preview
 
     private var previewUI: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SpotDesign.Spacing.xl) {
             SpotCircleButton(systemImage: "chevron.left", accessibilityLabel: "Terug") {
                 // Back to search; keep query if you want to refine.
                 nav.clearAll()
@@ -244,8 +244,8 @@ struct HomeBottomOverlay: View {
             Button {
                 nav.startNavigation()
             } label: {
-                VStack(spacing: 2) {
-                    HStack(spacing: 8) {
+                VStack(spacing: SpotDesign.Spacing.xxs) {
+                    HStack(spacing: SpotDesign.Spacing.md) {
                         Text(primaryPreviewTime)
                             .font(.headline.monospacedDigit().weight(.bold))
                         Text(primaryPreviewDistance)
@@ -258,10 +258,10 @@ struct HomeBottomOverlay: View {
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 14)
+                .padding(.vertical, SpotDesign.Spacing.xl)
+                .padding(.horizontal, SpotDesign.Spacing.xxl)
                 .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous)
                         .fill(Color.blue)
                 )
             }
@@ -273,10 +273,10 @@ struct HomeBottomOverlay: View {
                 cancelSearch()
             }
         }
-        .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
-        .shadow(radius: 12)
+        .padding(SpotDesign.Spacing.xl)
+        .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+        .shadow(radius: SpotDesign.Elevation.shadowHigh)
     }
 
     private var primaryPreviewDistance: String {
@@ -296,8 +296,8 @@ struct HomeBottomOverlay: View {
     // MARK: - Guidance
 
     private var guidanceUI: some View {
-        VStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: SpotDesign.Spacing.lg) {
+            VStack(alignment: .leading, spacing: SpotDesign.Spacing.xs) {
                 Text(nav.instruction.isEmpty ? (nav.destinationName ?? "Route") : nav.instruction)
                     .font(.system(size: 16, weight: .bold))
                     .lineLimit(2)
@@ -309,12 +309,12 @@ struct HomeBottomOverlay: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.10)))
+            .padding(SpotDesign.Spacing.xl)
+            .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.panel, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
 
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: SpotDesign.Spacing.lg) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                     Text(primaryGuidanceDistance)
                         .font(.headline.monospacedDigit().weight(.bold))
                     Text(primaryGuidanceTime)
@@ -327,9 +327,9 @@ struct HomeBottomOverlay: View {
                 if nav.offRouteMeters > 0 {
                     Text("\(Int(nav.offRouteMeters)) m off-route")
                         .font(.caption.weight(.semibold))
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(.thinMaterial, in: Capsule())
+                        .padding(.vertical, SpotDesign.Spacing.sm)
+                        .padding(.horizontal, SpotDesign.Spacing.lg)
+                        .background(SpotDesign.Elevation.controlMaterial, in: Capsule())
                 }
 
                 SpotCircleButton(systemImage: "list.bullet", accessibilityLabel: "Stappen") {
@@ -346,15 +346,15 @@ struct HomeBottomOverlay: View {
                     Text("Stop")
                         .font(.subheadline.weight(.semibold))
                         .frame(width: 54, height: 36)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.10)))
+                        .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.pill, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.10)))
-            .shadow(radius: 12)
+            .padding(SpotDesign.Spacing.xl)
+            .background(SpotDesign.Elevation.surfaceMaterial, in: RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: SpotDesign.CornerRadius.overlay, style: .continuous).strokeBorder(.white.opacity(SpotDesign.Elevation.outlineSoftOpacity)))
+            .shadow(radius: SpotDesign.Elevation.shadowHigh)
         }
     }
 
@@ -398,7 +398,7 @@ struct HomeMenuSheet: View {
             List {
                 Section("Vrienden") {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: SpotDesign.Spacing.xs) {
                             Text("Jouw code")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -434,7 +434,7 @@ struct HomeMenuSheet: View {
                     } else {
                         ForEach(friends.friends) { f in
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: SpotDesign.Spacing.xxs) {
                                     Text(f.displayName)
                                     Text(f.code)
                                         .font(.caption)
@@ -462,7 +462,7 @@ struct HomeMenuSheet: View {
                     let totalKm = explore.totalDistanceKm(from: journeys.journeys)
                     let lvl = explore.level(for: totalKm)
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: SpotDesign.Spacing.lg) {
                         HStack {
                             Text("Level \(lvl)")
                                 .font(.headline)
@@ -476,7 +476,7 @@ struct HomeMenuSheet: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, SpotDesign.Spacing.sm)
 
                     Toggle("Explore-modus op kaart", isOn: $exploreEnabled)
                 }
@@ -524,7 +524,7 @@ struct HomeMenuSheet: View {
                 .disabled(!isAddFriendCodeValid)
                 Button("Cancel", role: .cancel) { addFriendCode = "" }
             } message: {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: SpotDesign.Spacing.sm) {
                     Text("Vraag je vriend om zijn/haar code en plak hem hier.")
                     if !trimmedAddFriendCode.isEmpty && !isAddFriendCodeValid {
                         Text("Code moet minimaal 6 tekens zijn.")
