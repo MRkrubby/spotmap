@@ -182,7 +182,7 @@ final class SceneSpriteCache {
         lock.lock(); defer { lock.unlock() }
         if let p = modelProto[assetPath] { return p }
 
-        let url = resolveBundleURL(assetPath: assetPath)
+        let url = AssetBundleResolver.resolveURL(for: assetPath, log: log)
         let node: SCNNode
 
         if let url {
@@ -197,51 +197,6 @@ final class SceneSpriteCache {
 
         modelProto[assetPath] = node
         return node
-    }
-
-private func resolveBundleURL(assetPath: String) -> URL? {
-        // Support "CloudAssets/Foo.usdz" style paths reliably.
-        // Important: depending on how Xcode copies resources, the file may end up
-        // either inside its subdirectory **or** flattened at the bundle root.
-        // We therefore try subdirectory lookup first, then fall back to the root.
-
-        // 1) Subdirectory-aware lookup (preferred).
-        if assetPath.contains("/") {
-            let parts = assetPath.split(separator: "/")
-            if parts.count >= 2 {
-                let subdir = parts.dropLast().joined(separator: "/")
-                let filename = String(parts.last!)
-                let name = (filename as NSString).deletingPathExtension
-                let ext = (filename as NSString).pathExtension
-
-                if let url = Bundle.main.url(forResource: name, withExtension: ext.isEmpty ? nil : ext, subdirectory: subdir) {
-                    return url
-                }
-
-                // 2) Fallback: flattened copy (common when files are added as individual resources).
-                if let url = Bundle.main.url(forResource: name, withExtension: ext.isEmpty ? nil : ext) {
-                    return url
-                }
-
-                // 3) Last resort: try the full filename as a single resource name.
-                if let url = Bundle.main.url(forResource: filename, withExtension: nil) {
-                    return url
-                }
-
-                log.error("Missing asset in bundle: \(assetPath, privacy: .public)")
-                return nil
-            }
-        }
-
-        // Non-subdirectory path.
-        let name = (assetPath as NSString).deletingPathExtension
-        let ext = (assetPath as NSString).pathExtension
-        if let url = Bundle.main.url(forResource: name, withExtension: ext.isEmpty ? nil : ext) {
-            return url
-        }
-
-        log.error("Missing asset in bundle: \(assetPath, privacy: .public)")
-        return nil
     }
 
     private func normalizePivot(_ node: SCNNode) {
