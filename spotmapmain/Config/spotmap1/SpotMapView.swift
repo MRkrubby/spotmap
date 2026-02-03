@@ -615,20 +615,15 @@ private struct SpotMapMapLayer: View {
                 // TRUE 3D clouds overlay.
                 // Only render when Explore is enabled.
                 if exploreEnabled {
-                    // Convert cloud world coordinates to screen-space points.
-                    // We keep clouds pinned to the map content (screen-space) and render them as true 3D
-                    // in a transparent SceneKit overlay.
-                    //
-                    // IMPORTANT:
-                    // Keep clouds world-anchored so they stay fixed relative to map content while
-                    // the camera moves around them. `MapProxy.convert` already accounts for the
-                    // current camera heading/pitch, so we keep the projected points as-is.
-                    let items: [CloudVoxelItem] = fogCloudField.clouds.compactMap { (cloud) -> CloudVoxelItem? in
-                        guard let pt = proxy.convert(cloud.coordinate, to: .local) else { return nil }
-                        return CloudVoxelItem(
+                    // Convert cloud world coordinates into deterministic map points.
+                    // The SceneKit overlay projects those world positions into view space using
+                    // the current center + meters-per-point so camera motion doesn't re-seed
+                    // or re-place clouds (only LOD/visibility changes with viewport).
+                    let items: [CloudVoxelItem] = fogCloudField.clouds.map { cloud in
+                        CloudVoxelItem(
                             id: cloud.id,
-                            screenPoint: pt,
-                            sizePoints: cloud.sizePoints,
+                            mapPoint: MKMapPoint(cloud.coordinate),
+                            sizeMeters: cloud.sizeMeters,
                             altitudeMeters: cloud.altitudeMeters,
                             asset: cloud.asset,
                             seed: cloud.seed
