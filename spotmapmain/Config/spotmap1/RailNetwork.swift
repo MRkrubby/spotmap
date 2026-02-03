@@ -24,6 +24,10 @@ enum RailNetwork {
     ]
 
     static let linePolyline: MKPolyline = {
+        guard lineNodes.count >= 2 else {
+            print("RailNetwork: lineNodes has fewer than 2 nodes; skipping polyline creation.")
+            return MKPolyline()
+        }
         let coords = lineNodes.map(\.coordinate)
         return MKPolyline(coordinates: coords, count: coords.count)
     }()
