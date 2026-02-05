@@ -815,6 +815,7 @@ private struct SpotMapMapLayer: View {
 private struct SpotMapSheetPresenter: ViewModifier {
     @EnvironmentObject private var journeys: JourneyRepository
     @EnvironmentObject private var nav: NavigationManager
+    @EnvironmentObject private var friends: FriendsStore
     @ObservedObject var vm: SpotMapViewModel
     @Binding var showingSpotsList: Bool
     @Binding var showingSettings: Bool

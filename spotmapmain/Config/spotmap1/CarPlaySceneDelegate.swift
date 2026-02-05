@@ -1,5 +1,5 @@
 import Foundation
-import CarPlay
+@preconcurrency import CarPlay
 import UIKit
 import MapKit
 import CoreLocation
@@ -464,8 +464,7 @@ final class CarPlayCoordinator: NSObject {
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 
-    private func handleSearchTemplate(_ searchTemplate: CPSearchTemplate,
-                                      updatedSearchText searchText: String,
+    private func handleSearchTemplate(updatedSearchText searchText: String,
                                       completionHandler: @escaping ([CPListItem]) -> Void) {
         // Cancel any in-flight search to keep UI responsive and avoid calling the completion handler out-of-order.
         searchTask?.cancel()
@@ -534,7 +533,7 @@ extension CarPlayCoordinator: CPSearchTemplateDelegate {
                                     updatedSearchText searchText: String,
                                     completionHandler: @escaping ([CPListItem]) -> Void) {
         DispatchQueue.main.async { [weak self] in
-            self?.handleSearchTemplate(searchTemplate, updatedSearchText: searchText, completionHandler: completionHandler)
+            self?.handleSearchTemplate(updatedSearchText: searchText, completionHandler: completionHandler)
         }
     }
 

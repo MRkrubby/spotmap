@@ -1,5 +1,6 @@
 import SwiftUI
 import SceneKit
+import SceneKit.ModelIO
 import UIKit
 import simd
 import MapKit
@@ -74,6 +75,8 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
         private var prototypes: [CloudAsset: SCNNode] = [:]
 
         private var didConfigure: Bool = false
+
+        private static let facingYawOffset: Float = .pi / 18
 
         init() {
             scene.rootNode.addChildNode(cloudRoot)
@@ -213,6 +216,26 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
             node.pivot = SCNMatrix4MakeTranslation(cx, cy, cz)
         }
 
+        private static func wrapRadians(_ a: Float) -> Float {
+            var x = a
+            let twoPi: Float = 2 * .pi
+            x = fmodf(x + .pi, twoPi)
+            if x < 0 { x += twoPi }
+            return x - .pi
+        }
+
+        private func loadPrototype(asset: CloudAsset) -> SCNNode {
+            AssetBundleResolver.loadSceneNode(
+                assetPath: asset.rawValue,
+                log: log,
+                fallback: .voxelCloud
+            ) { url in
+                // Prefer ModelIO for USDZ: it preserves materials and gives stable bounds.
+                let mdlAsset = MDLAsset(url: url)
+                let scene = SCNScene(mdlAsset: mdlAsset)
+                return scene.rootNode.flattenedClone()
+            }
+        }
 
         private func makeAssetCloud(asset: CloudAsset, seed: UInt64) -> SCNNode {
             // Load prototype once.
@@ -289,7 +312,7 @@ struct CloudVoxelOverlayView: UIViewRepresentable {
                 n.position = SCNVector3(x * 70, y * 60, z * 40)
                 container.addChildNode(n)
             }
-            return node
+            return container
         }
 
         // MARK: - Tiny RNG

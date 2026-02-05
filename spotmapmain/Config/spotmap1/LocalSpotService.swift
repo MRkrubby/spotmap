@@ -20,11 +20,13 @@ final class LocalSpotService: SpotService {
     }
 
     func save(spot: Spot) async throws -> Spot {
-        var all = load()
-        all.removeAll { $0.id.recordName == spot.id.recordName }
-        all.insert(spot, at: 0)
-        persist(all)
-        return spot
+        return await MainActor.run {
+            var all = load()
+            all.removeAll { $0.id.recordName == spot.id.recordName }
+            all.insert(spot, at: 0)
+            persist(all)
+            return spot
+        }
     }
 
     func fetchSpot(by id: CKRecord.ID) async throws -> Spot {
