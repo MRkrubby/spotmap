@@ -1,0 +1,79 @@
+name: Xcode - Build and Analyze
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build and analyse default scheme using xcodebuild command
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Locate Xcode project/workspace
+        id: xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "spotmapmain/Config"
+            "spotmapmain"
+            "Spotmap Buildmain"
+          )
+          workspace=""
+          project=""
+
+          for dir in "${candidates[@]}"; do
+            if [ -d "$dir" ]; then
+              workspace=$(ls -1 "$dir"/*.xcworkspace 2>/dev/null | head -n 1 || true)
+              project=$(ls -1 "$dir"/*.xcodeproj 2>/dev/null | head -n 1 || true)
+              if [ -n "$workspace" ] || [ -n "$project" ]; then
+                break
+              fi
+            fi
+          done
+
+          if [ -z "$workspace" ] && [ -z "$project" ]; then
+            workspace=$(find . -maxdepth 4 -name "*.xcworkspace" ! -name "Pods.xcworkspace" | head -n 1 || true)
+            project=$(find . -maxdepth 4 -name "*.xcodeproj" ! -name "Pods.xcodeproj" | head -n 1 || true)
+          fi
+
+          if [ -n "$workspace" ]; then
+            echo "type=workspace" >> "$GITHUB_OUTPUT"
+            echo "path=$workspace" >> "$GITHUB_OUTPUT"
+            echo "Using workspace: $workspace"
+          elif [ -n "$project" ]; then
+            echo "type=project" >> "$GITHUB_OUTPUT"
+            echo "path=$project" >> "$GITHUB_OUTPUT"
+            echo "Using project: $project"
+          else
+            echo "::error::No .xcworkspace or .xcodeproj found."
+            exit 1
+          fi
+
+      - name: Set Default Scheme
+        shell: bash
+        run: |
+          set -euo pipefail
+          scheme_list=$(xcodebuild -list -json -${{ steps.xcode.outputs.type }} "${{ steps.xcode.outputs.path }}" | tr -d "\n")
+          default=$(echo "$scheme_list" | ruby -e "require 'json'; data=JSON.parse(STDIN.read); schemes = data.dig('workspace','schemes') || data.dig('project','schemes') || data.dig('project','targets') || []; puts schemes[0].to_s")
+          if [ -z "$default" ]; then
+            echo "::error::Could not determine default scheme from xcodebuild -list output."
+            exit 1
+          fi
+          echo "$default" | cat >default
+          echo "Using default scheme: $default"
+
+      - name: Build
+        env:
+          scheme: ${{ 'default' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$scheme" = default ]; then scheme=$(cat default); fi
+          xcodebuild clean build analyze -scheme "$scheme" -${{ steps.xcode.outputs.type }} "${{ steps.xcode.outputs.path }}" | xcpretty && exit ${PIPESTATUS[0]}
