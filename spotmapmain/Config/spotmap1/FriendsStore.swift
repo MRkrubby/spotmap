@@ -138,6 +138,16 @@ struct FriendProfile: Identifiable, Hashable, Codable {
 /// Named `FriendsStore` (instead of `FriendsRepository`) to avoid symbol clashes
 /// if a project or dependency also defines a `FriendsRepository` type.
 final class FriendsStore: ObservableObject {
+    // Live journey configuration
+    // Maximum number of points we keep in the rolling buffer we publish/store
+    static let liveJourneyBufferMaxPoints: Int = 300
+    // Cap on how many incoming points from the caller we consider per update
+    static let liveJourneyInputCap: Int = 1000
+    // Minimum distance between kept points to reduce noise (in meters)
+    static let liveJourneyMinDistanceMeters: CLLocationDistance = 8
+    // Minimum time interval between kept points (in seconds)
+    static let liveJourneyMinTimeInterval: TimeInterval = 5
+
     enum FriendsStoreError: LocalizedError {
         case cloudKitNotAvailable(String)
 
@@ -383,7 +393,7 @@ final class FriendsStore: ObservableObject {
     func publish() async {
         guard isEnabled else { return }
         do {
-            setLastError(nil)
+            await setLastError(nil)
             try await ensureCloudKitAvailable()
 
             guard let db else {
@@ -427,15 +437,15 @@ final class FriendsStore: ObservableObject {
             }
             _ = try await db.save(record)
         } catch {
-            setLastError(error.localizedDescription)
-            disableIfEntitlementOrAccountIssue(error)
+            await setLastError(error.localizedDescription)
+            await disableIfEntitlementOrAccountIssue(error)
         }
     }
 
     func refreshFriends() async {
         guard isEnabled else { return }
         do {
-            setLastError(nil)
+            await setLastError(nil)
             try await ensureCloudKitAvailable()
 
             guard let db else {
@@ -444,7 +454,7 @@ final class FriendsStore: ObservableObject {
 
             let codes = Array(followingCodes())
             guard !codes.isEmpty else {
-                setFriends([])
+                await setFriends([])
                 return
             }
 
@@ -457,7 +467,7 @@ final class FriendsStore: ObservableObject {
                 loadedByCode[profile.code.uppercased()] = profile
             }
             if !fetchResult.failures.isEmpty {
-                setLastError("Some friends could not be refreshed.")
+                await setLastError("Some friends could not be refreshed.")
             }
 
             var merged: [FriendProfile] = []
@@ -469,10 +479,10 @@ final class FriendsStore: ObservableObject {
                 }
             }
             let sorted = merged.sorted(by: { $0.displayName < $1.displayName })
-            setFriends(sorted)
+            await setFriends(sorted)
         } catch {
-            setLastError(error.localizedDescription)
-            disableIfEntitlementOrAccountIssue(error)
+            await setLastError(error.localizedDescription)
+            await disableIfEntitlementOrAccountIssue(error)
         }
     }
 
