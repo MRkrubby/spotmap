@@ -30,8 +30,8 @@ jobs:
 
           for dir in "${candidates[@]}"; do
             if [ -d "$dir" ]; then
-              workspace=$(ls -1 "$dir"/*.xcworkspace 2>/dev/null | head -n 1 || true)
-              project=$(ls -1 "$dir"/*.xcodeproj 2>/dev/null | head -n 1 || true)
+              workspace=$(find "$dir" -maxdepth 1 -type d -name "*.xcworkspace" | head -n 1 || true)
+              project=$(find "$dir" -maxdepth 1 -type d -name "*.xcodeproj" | head -n 1 || true)
               if [ -n "$workspace" ] || [ -n "$project" ]; then
                 break
               fi
@@ -39,8 +39,8 @@ jobs:
           done
 
           if [ -z "$workspace" ] && [ -z "$project" ]; then
-            workspace=$(find . -maxdepth 4 -name "*.xcworkspace" ! -name "Pods.xcworkspace" | head -n 1 || true)
-            project=$(find . -maxdepth 4 -name "*.xcodeproj" ! -name "Pods.xcodeproj" | head -n 1 || true)
+            workspace=$(find . -maxdepth 4 -type d -name "*.xcworkspace" ! -name "Pods.xcworkspace" | head -n 1 || true)
+            project=$(find . -maxdepth 4 -type d -name "*.xcodeproj" ! -name "Pods.xcodeproj" | head -n 1 || true)
           fi
 
           if [ -n "$workspace" ]; then
