@@ -7,28 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1E8618E418E44EECA3866703 /* spotmap/CloudAssets/StylizedCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F86DEB9E38E949B39BFA8885 /* spotmap/CloudAssets/StylizedCloud.usdz */; };
-		44CBC4A79E4B498592CF5DE1 /* spotmap/TreeAssets/LowPolyTrees.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 39F9EDAC788C4ACABF0D27B3 /* spotmap/TreeAssets/LowPolyTrees.usdz */; };
-		5561F80C1AD242D4B0389F12 /* spotmap/CloudAssets/CartoonCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F2F8CCF6697D424583CC0817 /* spotmap/CloudAssets/CartoonCloud.usdz */; };
+		1E8618E418E44EECA3866703 /* spotmap1/CloudAssets/StylizedCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F86DEB9E38E949B39BFA8885 /* spotmap1/CloudAssets/StylizedCloud.usdz */; };
+		44CBC4A79E4B498592CF5DE1 /* spotmap1/TreeAssets/LowPolyTrees.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 39F9EDAC788C4ACABF0D27B3 /* spotmap1/TreeAssets/LowPolyTrees.usdz */; };
+		5561F80C1AD242D4B0389F12 /* spotmap1/CloudAssets/CartoonCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F2F8CCF6697D424583CC0817 /* spotmap1/CloudAssets/CartoonCloud.usdz */; };
 		A4B5C6D7E8F9012345678901 /* spotmap1/vehicle_assets in Resources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F9012345678902 /* spotmap1/vehicle_assets */; };
-		B86F9F1F33034475888CAADA /* spotmap/CloudAssets/TinyCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = FD866495C14941E2A063FFE5 /* spotmap/CloudAssets/TinyCloud.usdz */; };
+		B86F9F1F33034475888CAADA /* spotmap1/CloudAssets/TinyCloud.usdz in Resources */ = {isa = PBXBuildFile; fileRef = FD866495C14941E2A063FFE5 /* spotmap1/CloudAssets/TinyCloud.usdz */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		108763122F2293900095CE68 /* spotmap.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = spotmap.xctestplan; sourceTree = "<group>"; };
 		10EB1E8B2F20354B00A95F3D /* spotmap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = spotmap.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		39F9EDAC788C4ACABF0D27B3 /* spotmap/TreeAssets/LowPolyTrees.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/TreeAssets/LowPolyTrees.usdz; sourceTree = "<group>"; };
+		39F9EDAC788C4ACABF0D27B3 /* spotmap1/TreeAssets/LowPolyTrees.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap1/TreeAssets/LowPolyTrees.usdz; sourceTree = "<group>"; };
 		A4B5C6D7E8F9012345678902 /* spotmap1/vehicle_assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = spotmap1/vehicle_assets; sourceTree = "<group>"; };
-		F1A1B2C3D4E5F60718293A01 /* Config/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Config/Info.plist; sourceTree = "<group>"; };
-		F2F8CCF6697D424583CC0817 /* spotmap/CloudAssets/CartoonCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/CloudAssets/CartoonCloud.usdz; sourceTree = "<group>"; };
-		F86DEB9E38E949B39BFA8885 /* spotmap/CloudAssets/StylizedCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/CloudAssets/StylizedCloud.usdz; sourceTree = "<group>"; };
-		FD866495C14941E2A063FFE5 /* spotmap/CloudAssets/TinyCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap/CloudAssets/TinyCloud.usdz; sourceTree = "<group>"; };
+		F1A1B2C3D4E5F60718293A01 /* Config/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F2F8CCF6697D424583CC0817 /* spotmap1/CloudAssets/CartoonCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap1/CloudAssets/CartoonCloud.usdz; sourceTree = "<group>"; };
+		F86DEB9E38E949B39BFA8885 /* spotmap1/CloudAssets/StylizedCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap1/CloudAssets/StylizedCloud.usdz; sourceTree = "<group>"; };
+		FD866495C14941E2A063FFE5 /* spotmap1/CloudAssets/TinyCloud.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = spotmap1/CloudAssets/TinyCloud.usdz; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		10A67B822F1FDD9A00696BC3 /* spotmap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = spotmap;
+			path = spotmap1;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -66,10 +66,10 @@
 		F3A2B252F5D34027A60A7BC5 /* BundledAssets */ = {
 			isa = PBXGroup;
 			children = (
-				F86DEB9E38E949B39BFA8885 /* spotmap/CloudAssets/StylizedCloud.usdz */,
-				F2F8CCF6697D424583CC0817 /* spotmap/CloudAssets/CartoonCloud.usdz */,
-				FD866495C14941E2A063FFE5 /* spotmap/CloudAssets/TinyCloud.usdz */,
-				39F9EDAC788C4ACABF0D27B3 /* spotmap/TreeAssets/LowPolyTrees.usdz */,
+				F86DEB9E38E949B39BFA8885 /* spotmap1/CloudAssets/StylizedCloud.usdz */,
+				F2F8CCF6697D424583CC0817 /* spotmap1/CloudAssets/CartoonCloud.usdz */,
+				FD866495C14941E2A063FFE5 /* spotmap1/CloudAssets/TinyCloud.usdz */,
+				39F9EDAC788C4ACABF0D27B3 /* spotmap1/TreeAssets/LowPolyTrees.usdz */,
 				A4B5C6D7E8F9012345678902 /* spotmap1/vehicle_assets */,
 			);
 			name = BundledAssets;
@@ -140,10 +140,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1E8618E418E44EECA3866703 /* spotmap/CloudAssets/StylizedCloud.usdz in Resources */,
-				5561F80C1AD242D4B0389F12 /* spotmap/CloudAssets/CartoonCloud.usdz in Resources */,
-				B86F9F1F33034475888CAADA /* spotmap/CloudAssets/TinyCloud.usdz in Resources */,
-				44CBC4A79E4B498592CF5DE1 /* spotmap/TreeAssets/LowPolyTrees.usdz in Resources */,
+				1E8618E418E44EECA3866703 /* spotmap1/CloudAssets/StylizedCloud.usdz in Resources */,
+				5561F80C1AD242D4B0389F12 /* spotmap1/CloudAssets/CartoonCloud.usdz in Resources */,
+				B86F9F1F33034475888CAADA /* spotmap1/CloudAssets/TinyCloud.usdz in Resources */,
+				44CBC4A79E4B498592CF5DE1 /* spotmap1/TreeAssets/LowPolyTrees.usdz in Resources */,
 				A4B5C6D7E8F9012345678901 /* spotmap1/vehicle_assets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -292,7 +292,7 @@
 				DEVELOPMENT_TEAM = QY4P77B8TW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -325,7 +325,7 @@
 				DEVELOPMENT_TEAM = QY4P77B8TW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
