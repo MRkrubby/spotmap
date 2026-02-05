@@ -463,16 +463,66 @@ final class CarPlayCoordinator: NSObject {
         guard let url = URL(string: string) else { return }
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
+
+    private func handleSearchTemplate(_ searchTemplate: CPSearchTemplate,
+                                      updatedSearchText searchText: String,
+                                      completionHandler: @escaping ([CPListItem]) -> Void) {
+        // Cancel any in-flight search to keep UI responsive and avoid calling the completion handler out-of-order.
+        searchTask?.cancel()
+        searchTask = nil
+
+        let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count >= 2 else {
+            DispatchQueue.main.async { completionHandler([]) }
+            return
+        }
+
+        searchTask = Task { [weak self] in
+            guard let self else {
+                DispatchQueue.main.async { completionHandler([]) }
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = text
+            request.resultTypes = [.address, .pointOfInterest]
+
+            do {
+                let response = try await MKLocalSearch(request: request).start()
+                guard !Task.isCancelled else { return }
+
+                let items = response.mapItems.prefix(10).map { item -> CPListItem in
+                    let title = item.name ?? "Resultaat"
+                    let subtitle = item.placemark.title
+                    let listItem = CPListItem(text: title, detailText: subtitle)
+                    listItem.handler = { [weak self] _, completion in
+                        self?.previewRoutes(to: item, name: title)
+                        completion()
+                    }
+                    return listItem
+                }
+
+                DispatchQueue.main.async {
+                    completionHandler(Array(items))
+                }
+            } catch {
+                // Ignore errors (often "network unavailable" etc.) and just return an empty list.
+                DispatchQueue.main.async { completionHandler([]) }
+            }
+        }
+    }
 }
 
 // MARK: - CPMapTemplateDelegate
 
 extension CarPlayCoordinator: CPMapTemplateDelegate {
-    func mapTemplateDidBeginPanGesture(_ mapTemplate: CPMapTemplate) {
+    nonisolated func mapTemplateDidBeginPanGesture(_ mapTemplate: CPMapTemplate) {
         // No-op: we keep UI minimal.
     }
 
-    func mapTemplateDidEndPanGesture(_ mapTemplate: CPMapTemplate) {
+    nonisolated func mapTemplateDidEndPanGesture(_ mapTemplate: CPMapTemplate) {
         // No-op.
     }
 }
@@ -480,61 +530,20 @@ extension CarPlayCoordinator: CPMapTemplateDelegate {
 // MARK: - CPSearchTemplateDelegate
 
 extension CarPlayCoordinator: CPSearchTemplateDelegate {
-    func searchTemplate(_ searchTemplate: CPSearchTemplate, updatedSearchText searchText: String, completionHandler: @escaping ([CPListItem]) -> Void) {
-    // Cancel any in-flight search to keep UI responsive and avoid calling the completion handler out-of-order.
-    searchTask?.cancel()
-    searchTask = nil
-
-    let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard text.count >= 2 else {
-        DispatchQueue.main.async { completionHandler([]) }
-        return
-    }
-
-    searchTask = Task { [weak self] in
-        guard let self else {
-            DispatchQueue.main.async { completionHandler([]) }
-            return
-        }
-
-        guard !Task.isCancelled else { return }
-
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = text
-        request.resultTypes = [.address, .pointOfInterest]
-
-        do {
-            let response = try await MKLocalSearch(request: request).start()
-            guard !Task.isCancelled else { return }
-
-            let items = response.mapItems.prefix(10).map { item -> CPListItem in
-                let title = item.name ?? "Resultaat"
-                let subtitle = item.placemark.title
-                let listItem = CPListItem(text: title, detailText: subtitle)
-                listItem.handler = { [weak self] _, completion in
-                    self?.previewRoutes(to: item, name: title)
-                    completion()
-                }
-                return listItem
-            }
-
-            DispatchQueue.main.async {
-                completionHandler(Array(items))
-            }
-        } catch {
-            // Ignore errors (often "network unavailable" etc.) and just return an empty list.
-            DispatchQueue.main.async { completionHandler([]) }
+    nonisolated func searchTemplate(_ searchTemplate: CPSearchTemplate,
+                                    updatedSearchText searchText: String,
+                                    completionHandler: @escaping ([CPListItem]) -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            self?.handleSearchTemplate(searchTemplate, updatedSearchText: searchText, completionHandler: completionHandler)
         }
     }
-}
 
-
-    func searchTemplate(_ searchTemplate: CPSearchTemplate, selectedResult item: CPListItem, completionHandler: @escaping () -> Void) {
+    nonisolated func searchTemplate(_ searchTemplate: CPSearchTemplate, selectedResult item: CPListItem, completionHandler: @escaping () -> Void) {
         // We handle selection via per-item handlers.
         completionHandler()
     }
 
-    func searchTemplateSearchButtonPressed(_ searchTemplate: CPSearchTemplate) {
+    nonisolated func searchTemplateSearchButtonPressed(_ searchTemplate: CPSearchTemplate) {
         // No-op.
     }
 }
@@ -678,4 +687,3 @@ private extension CPMapButton {
         return self
     }
 }
-

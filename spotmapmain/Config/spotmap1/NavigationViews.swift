@@ -231,7 +231,7 @@ final class PlaceSearchViewModel: NSObject, ObservableObject, MKLocalSearchCompl
 
     // MARK: - MKLocalSearchCompleterDelegate
 
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
         // Keep it snappy: show top 12 results.
         let res = Array(completer.results.prefix(12))
         Task { @MainActor in
@@ -240,7 +240,7 @@ final class PlaceSearchViewModel: NSObject, ObservableObject, MKLocalSearchCompl
         }
     }
 
-    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         Task { @MainActor in
             self.isSearching = false
             self.completions = []

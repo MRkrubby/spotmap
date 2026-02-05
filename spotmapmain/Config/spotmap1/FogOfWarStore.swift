@@ -12,7 +12,7 @@ import Combine
 ///   reducing draw calls / memory pressure.
 @MainActor
 final class FogOfWarStore: ObservableObject {
-    let objectWillChange = ObservableObjectPublisher()
+    nonisolated let objectWillChange = ObservableObjectPublisher()
     
     static let shared = FogOfWarStore()
 
@@ -284,4 +284,3 @@ final class FogOfWarStore: ObservableObject {
         UserDefaults.standard.set(data, forKey: key)
     }
 }
-

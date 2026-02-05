@@ -3,6 +3,7 @@ import SceneKit
 import UIKit
 import simd
 import MapKit
+import os
 
 /// A renderable cloud item in world coordinates.
 struct CloudVoxelItem: Identifiable, Hashable {
@@ -12,6 +13,14 @@ struct CloudVoxelItem: Identifiable, Hashable {
     let altitudeMeters: Double
     let asset: CloudAsset
     let seed: UInt64
+
+    static func == (lhs: CloudVoxelItem, rhs: CloudVoxelItem) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 /// True 3D voxel/low-poly clouds rendered in a single SceneKit view.
