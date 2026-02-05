@@ -76,4 +76,20 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$scheme" = default ]; then scheme=$(cat default); fi
-          xcodebuild clean build analyze -scheme "$scheme" -${{ steps.xcode.outputs.type }} "${{ steps.xcode.outputs.path }}" | xcpretty && exit ${PIPESTATUS[0]}
+          logfile="xcodebuild.log"
+          destination="generic/platform=iOS"
+          xcodebuild clean build analyze \
+            -scheme "$scheme" \
+            -${{ steps.xcode.outputs.type }} "${{ steps.xcode.outputs.path }}" \
+            -destination "$destination" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee "$logfile" | xcpretty
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::group::xcodebuild.log (tail)"
+            tail -n 200 "$logfile"
+            echo "::endgroup::"
+            exit "$status"
+          fi
